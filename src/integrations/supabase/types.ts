@@ -14,16 +14,266 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      club_tables: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          type: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          type: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          type?: string
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          created_at: string
+          id: string
+          last_visit: string | null
+          name: string
+          phone: string
+          visits: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_visit?: string | null
+          name: string
+          phone: string
+          visits?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_visit?: string | null
+          name?: string
+          phone?: string
+          visits?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      session_extras: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          price: number
+          qty: number
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          price: number
+          qty?: number
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          price?: number
+          qty?: number
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_extras_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sessions: {
+        Row: {
+          accumulated_ms: number
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          customer_name: string
+          customer_phone: string
+          discount: number
+          ended_at: string | null
+          extras_total: number
+          hourly_rate: number
+          id: string
+          manual_adjustment: number
+          payment: string
+          run_started_at: string | null
+          started_at: string
+          status: string
+          table_id: string
+          table_name: string
+          table_type: string
+          tax_rate: number
+          total: number
+        }
+        Insert: {
+          accumulated_ms?: number
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          customer_name: string
+          customer_phone: string
+          discount?: number
+          ended_at?: string | null
+          extras_total?: number
+          hourly_rate: number
+          id?: string
+          manual_adjustment?: number
+          payment?: string
+          run_started_at?: string | null
+          started_at?: string
+          status?: string
+          table_id: string
+          table_name: string
+          table_type: string
+          tax_rate?: number
+          total?: number
+        }
+        Update: {
+          accumulated_ms?: number
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          customer_name?: string
+          customer_phone?: string
+          discount?: number
+          ended_at?: string | null
+          extras_total?: number
+          hourly_rate?: number
+          id?: string
+          manual_adjustment?: number
+          payment?: string
+          run_started_at?: string | null
+          started_at?: string
+          status?: string
+          table_id?: string
+          table_name?: string
+          table_type?: string
+          tax_rate?: number
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessions_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "club_tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settings: {
+        Row: {
+          club_name: string
+          country_code: string
+          currency: string
+          id: number
+          pool_rate: number
+          snooker_rate: number
+          tax_rate: number
+          updated_at: string
+        }
+        Insert: {
+          club_name?: string
+          country_code?: string
+          currency?: string
+          id?: number
+          pool_rate?: number
+          snooker_rate?: number
+          tax_rate?: number
+          updated_at?: string
+        }
+        Update: {
+          club_name?: string
+          country_code?: string
+          currency?: string
+          id?: number
+          pool_rate?: number
+          snooker_rate?: number
+          tax_rate?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +400,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "staff"],
+    },
   },
 } as const
