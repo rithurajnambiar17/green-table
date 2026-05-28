@@ -1,5 +1,5 @@
 export type TableType = "snooker" | "pool";
-export type SessionStatus = "idle" | "running" | "paused" | "ended";
+export type SessionStatus = "running" | "paused" | "ended";
 export type PaymentStatus = "unpaid" | "paid";
 export type Role = "admin" | "staff";
 
@@ -7,6 +7,8 @@ export interface ClubTable {
   id: string;
   name: string;
   type: TableType;
+  active?: boolean;
+  sortOrder?: number;
 }
 
 export interface Customer {
@@ -17,27 +19,36 @@ export interface Customer {
   lastVisit: string | null;
 }
 
+export interface SessionExtra {
+  id: string;
+  sessionId: string;
+  name: string;
+  price: number;
+  qty: number;
+  createdAt: string;
+}
+
 export interface Session {
   id: string;
   tableId: string;
   tableName: string;
   tableType: TableType;
-  customerId: string;
+  customerId: string | null;
   customerName: string;
   customerPhone: string;
-  startedAt: string; // ISO
+  startedAt: string;
   endedAt: string | null;
-  // accumulated billable ms (excluding paused time)
   accumulatedMs: number;
-  // when status === running, the moment we started the current run
   runStartedAt: string | null;
   status: SessionStatus;
   hourlyRate: number;
-  discount: number; // currency
-  manualAdjustment: number; // can be negative
-  taxRate: number; // percent, e.g. 5
-  total: number; // computed final total when ended
+  discount: number;
+  manualAdjustment: number;
+  taxRate: number;
+  extrasTotal: number;
+  total: number;
   payment: PaymentStatus;
+  extras: SessionExtra[];
 }
 
 export interface Settings {
@@ -45,8 +56,8 @@ export interface Settings {
   currency: string;
   snookerRate: number;
   poolRate: number;
-  taxRate: number; // %
-  countryCode: string; // +92 etc., for wa.me links (digits only)
+  taxRate: number;
+  countryCode: string;
 }
 
 export interface User {

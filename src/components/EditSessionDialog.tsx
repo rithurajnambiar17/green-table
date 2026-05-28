@@ -2,17 +2,13 @@ import { useEffect, useState } from "react";
 import { useApp, sessionElapsedMs } from "@/lib/store";
 import type { Session } from "@/lib/types";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { calcBill, formatCurrency } from "@/lib/format";
+import { calcBill, formatCurrency, sumExtras } from "@/lib/format";
+import { ExtrasManager } from "./ExtrasManager";
 
 interface Props {
   session: Session | null;
@@ -27,29 +23,24 @@ export function EditSessionDialog({ session, open, onOpenChange }: Props) {
   const [rate, setRate] = useState(0);
 
   useEffect(() => {
-    if (session) {
-      setDiscount(session.discount);
-      setAdj(session.manualAdjustment);
-      setRate(session.hourlyRate);
-    }
+    if (session) { setDiscount(session.discount); setAdj(session.manualAdjustment); setRate(session.hourlyRate); }
   }, [session]);
 
   if (!session) return null;
   const elapsed = sessionElapsedMs(session);
+  const extrasTotal = sumExtras(session.extras);
   const preview = calcBill({
-    durationMs: elapsed,
-    hourlyRate: rate,
-    discount,
-    manualAdjustment: adj,
-    taxRate: session.taxRate,
+    durationMs: elapsed, hourlyRate: rate,
+    discount, manualAdjustment: adj,
+    taxRate: session.taxRate, extrasTotal,
   });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="glass">
+      <DialogContent className="glass max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-display">Edit session — {session.tableName}</DialogTitle>
-          <DialogDescription>Adjust rate, discount and manual charges. Tax {session.taxRate}%.</DialogDescription>
+          <DialogDescription>Adjust rate, discount, manual charges and extras. Tax {session.taxRate}%.</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-3 gap-3 py-2">
@@ -67,8 +58,14 @@ export function EditSessionDialog({ session, open, onOpenChange }: Props) {
           </div>
         </div>
 
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">Extras</p>
+          <ExtrasManager session={session} compact />
+        </div>
+
         <div className="rounded-xl border border-border/60 bg-muted/40 p-3">
-          <div className="flex justify-between text-sm"><span>Base</span><span>{formatCurrency(preview.base, settings.currency)}</span></div>
+          <div className="flex justify-between text-sm"><span>Table charge</span><span>{formatCurrency(preview.tableCharge, settings.currency)}</span></div>
+          <div className="flex justify-between text-sm"><span>Extras</span><span>{formatCurrency(preview.extras, settings.currency)}</span></div>
           <div className="flex justify-between text-sm"><span>Tax ({session.taxRate}%)</span><span>{formatCurrency(preview.tax, settings.currency)}</span></div>
           <div className="mt-2 flex justify-between border-t border-border/60 pt-2 font-display text-lg">
             <span>Total</span><span className="text-neon">{formatCurrency(preview.total, settings.currency)}</span>
@@ -77,12 +74,10 @@ export function EditSessionDialog({ session, open, onOpenChange }: Props) {
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button
-            onClick={() => {
-              updateSession(session.id, { hourlyRate: rate, discount, manualAdjustment: adj });
-              onOpenChange(false);
-            }}
-          >Save</Button>
+          <Button onClick={async () => {
+            await updateSession(session.id, { hourlyRate: rate, discount, manualAdjustment: adj });
+            onOpenChange(false);
+          }}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

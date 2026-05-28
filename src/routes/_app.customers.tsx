@@ -22,7 +22,7 @@ function CustomersPage() {
       map.set(c.id, { id: c.id, name: c.name, phone: c.phone, visits: 0, spend: 0, last: null });
     }
     for (const s of sessions) {
-      const key = s.customerId;
+      const key = s.customerId ?? `phone:${s.customerPhone}`;
       const existing = map.get(key) ?? { id: key, name: s.customerName, phone: s.customerPhone, visits: 0, spend: 0, last: null };
       existing.visits += 1;
       if (s.payment === "paid") existing.spend += s.total;
