@@ -222,7 +222,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await supabase.from("club_tables").insert({ name, type, sort_order: maxOrder + 1 });
   }, [tables]);
   const updateTable: AppContextValue["updateTable"] = useCallback(async (id, patch) => {
-    const dbPatch: Record<string, unknown> = {};
+    const dbPatch: { name?: string; type?: string; active?: boolean } = {};
     if (patch.name !== undefined) dbPatch.name = patch.name;
     if (patch.type !== undefined) dbPatch.type = patch.type;
     if (patch.active !== undefined) dbPatch.active = patch.active;
@@ -305,7 +305,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [sessions]);
 
   const updateSession: AppContextValue["updateSession"] = useCallback(async (id, patch) => {
-    const dbPatch: Record<string, unknown> = {};
+    const dbPatch: { hourly_rate?: number; discount?: number; manual_adjustment?: number; tax_rate?: number } = {};
     if (patch.hourlyRate !== undefined) dbPatch.hourly_rate = patch.hourlyRate;
     if (patch.discount !== undefined) dbPatch.discount = patch.discount;
     if (patch.manualAdjustment !== undefined) dbPatch.manual_adjustment = patch.manualAdjustment;
