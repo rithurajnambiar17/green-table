@@ -1,20 +1,17 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
-  Play,
-  Pause,
-  Square,
-  CheckCircle2,
-  Pencil,
-  CircleDollarSign,
-  MessageCircle,
+  Play, Pause, Square, CheckCircle2, Pencil, CircleDollarSign,
+  MessageCircle, Coffee, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { sessionElapsedMs, useApp } from "@/lib/store";
 import type { ClubTable, Session } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { calcBill, formatCurrency, formatDuration, thankYouMessage, waLink } from "@/lib/format";
+import { calcBill, formatCurrency, formatDuration, sumExtras, thankYouMessage, waLink } from "@/lib/format";
 import { toast } from "sonner";
+import { ExtrasManager } from "./ExtrasManager";
+import { useMounted } from "@/hooks/use-mounted";
 
 interface Props {
   table: ClubTable;
@@ -25,8 +22,12 @@ interface Props {
 
 export function TableCard({ table, session, onStart, onEdit }: Props) {
   const { pauseSession, resumeSession, endSession, markPaid, settings } = useApp();
+  const mounted = useMounted();
+  const [showExtras, setShowExtras] = useState(false);
 
-  const elapsed = session ? sessionElapsedMs(session) : 0;
+  const elapsed = session && mounted ? sessionElapsedMs(session) : session?.accumulatedMs ?? 0;
+  const extrasTotal = useMemo(() => session ? sumExtras(session.extras) : 0, [session]);
+
   const live = useMemo(() => {
     if (!session) return null;
     return calcBill({
@@ -35,8 +36,9 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
       discount: session.discount,
       manualAdjustment: session.manualAdjustment,
       taxRate: session.taxRate,
+      extrasTotal,
     });
-  }, [session, elapsed]);
+  }, [session, elapsed, extrasTotal]);
 
   const status = session?.status ?? "idle";
 
@@ -58,7 +60,6 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
           : "hover:border-primary/40 hover:shadow-glass",
       ].join(" ")}
     >
-      {/* Felt header */}
       <div className="relative h-28 felt-surface">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,color-mix(in_oklab,white_18%,transparent),transparent_60%)]" />
         <div className="absolute left-5 top-4">
@@ -70,7 +71,6 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
           <h3 className="font-display text-xl text-white drop-shadow">{table.name}</h3>
           <Badge className={statusBadge[status].className}>{statusBadge[status].label}</Badge>
         </div>
-        {/* balls deco */}
         <div className="pointer-events-none absolute right-4 top-3 flex -space-x-1 opacity-90">
           <span className="h-3 w-3 rounded-full bg-rose-500 ring-1 ring-white/40" />
           <span className="h-3 w-3 rounded-full bg-amber-400 ring-1 ring-white/40" />
@@ -97,15 +97,42 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-xl border border-border/60 bg-muted/40 p-3">
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Elapsed</p>
-                <p className="font-display text-2xl tabular-nums text-neon">{formatDuration(elapsed)}</p>
+                <p suppressHydrationWarning className="font-display text-2xl tabular-nums text-neon">
+                  {formatDuration(elapsed)}
+                </p>
               </div>
               <div className="rounded-xl border border-border/60 bg-muted/40 p-3">
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Running Bill</p>
-                <p className="font-display text-2xl tabular-nums">
+                <p suppressHydrationWarning className="font-display text-2xl tabular-nums">
                   {formatCurrency(live?.total ?? 0, settings.currency)}
                 </p>
+                {extrasTotal > 0 && (
+                  <p className="text-[10px] text-muted-foreground">incl. extras {formatCurrency(extrasTotal, settings.currency)}</p>
+                )}
               </div>
             </div>
+
+            {(status === "running" || status === "paused") && (
+              <div className="rounded-xl border border-border/60 bg-muted/20">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between px-3 py-2 text-sm"
+                  onClick={() => setShowExtras((v) => !v)}
+                >
+                  <span className="flex items-center gap-2 font-medium">
+                    <Coffee className="h-4 w-4 text-neon" />
+                    Extras (tea, cigarette, snacks…)
+                    {session.extras.length > 0 && <Badge variant="outline">{session.extras.length}</Badge>}
+                  </span>
+                  {showExtras ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {showExtras && (
+                  <div className="border-t border-border/60 p-3">
+                    <ExtrasManager session={session} />
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-2">
               {status === "running" && (
@@ -122,8 +149,8 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={() => {
-                    endSession(session.id);
+                  onClick={async () => {
+                    await endSession(session.id);
                     toast.success("Session ended. Confirm payment to send thank-you.");
                   }}
                 >
@@ -137,8 +164,8 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
                 <Button
                   size="sm"
                   className="bg-success text-success-foreground hover:bg-success/90"
-                  onClick={() => {
-                    markPaid(session.id);
+                  onClick={async () => {
+                    await markPaid(session.id);
                     const msg = thankYouMessage(settings.clubName, session.customerName, session.total, settings.currency);
                     const url = waLink(session.customerPhone, settings.countryCode, msg);
                     window.open(url, "_blank", "noopener,noreferrer");

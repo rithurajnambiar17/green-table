@@ -5,8 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { TableManager } from "@/components/TableManager";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({ meta: [{ title: "Settings — Green Table" }] }),
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_app/settings")({
 });
 
 function SettingsPage() {
-  const { settings, updateSettings, user, tables } = useApp();
+  const { settings, updateSettings, user } = useApp();
   const [form, setForm] = useState(settings);
   useEffect(() => setForm(settings), [settings]);
 
@@ -29,7 +29,7 @@ function SettingsPage() {
 
       {!isAdmin && (
         <Card className="border-warning/40 bg-warning/10 p-4 text-sm">
-          You are signed in as <b>staff</b>. Pricing and tax fields are read-only — ask an admin to edit.
+          You are signed in as <b>staff</b>. Pricing, tax and table management are read-only — ask an admin to edit.
         </Card>
       )}
 
@@ -71,29 +71,22 @@ function SettingsPage() {
         </Card>
       </div>
 
-      <Card className="glass p-6">
-        <h2 className="font-display text-xl">Tables</h2>
-        <p className="text-sm text-muted-foreground">Configured club tables (read-only in v1).</p>
-        <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {tables.map((t) => (
-            <li key={t.id} className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
-              <span>{t.name}</span>
-              <Badge variant="outline" className="capitalize">{t.type}</Badge>
-            </li>
-          ))}
-        </ul>
-      </Card>
-
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={() => setForm(settings)} disabled={!isAdmin}>Reset</Button>
         <Button
           disabled={!isAdmin}
-          onClick={() => {
-            updateSettings(form);
-            toast.success("Settings saved");
-          }}
+          onClick={async () => { await updateSettings(form); toast.success("Settings saved"); }}
         >Save changes</Button>
       </div>
+
+      {isAdmin ? (
+        <TableManager />
+      ) : (
+        <Card className="glass p-6">
+          <h2 className="font-display text-xl">Tables</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Only admins can add, edit or remove tables.</p>
+        </Card>
+      )}
     </div>
   );
 }
