@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Play, Pause, Square, CheckCircle2, Pencil, CircleDollarSign,
   MessageCircle, Coffee, ChevronDown, ChevronUp,
@@ -25,6 +25,16 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
   const mounted = useMounted();
   const [showExtras, setShowExtras] = useState(false);
 
+  const [tick, setTick] = useState(0);
+
+  // Re-render every second if the session is running
+  useEffect(() => {
+    if (session?.status !== "running") return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [session?.status]);
+
+  // Read the elapsed time based on the latest Date.now() (triggered by tick)
   const elapsed = session && mounted ? sessionElapsedMs(session) : session?.accumulatedMs ?? 0;
   const extrasTotal = useMemo(() => session ? sumExtras(session.extras) : 0, [session]);
 

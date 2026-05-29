@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_app/settings")({
 });
 
 function SettingsPage() {
-  const { settings, updateSettings, user } = useApp();
+  const { settings, updateSettings, user, clearData } = useApp();
   const [form, setForm] = useState(settings);
   useEffect(() => setForm(settings), [settings]);
 
@@ -85,6 +85,19 @@ function SettingsPage() {
         <Card className="glass p-6">
           <h2 className="font-display text-xl">Tables</h2>
           <p className="mt-1 text-sm text-muted-foreground">Only admins can add, edit or remove tables.</p>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card className="glass p-6 mt-6">
+          <h2 className="font-display text-xl text-red-600">Data Management</h2>
+          <p className="text-sm text-muted-foreground mb-4">Delete all sessions, extras, and customers. This action is irreversible.</p>
+          <Button variant="destructive" onClick={async () => {
+            if (confirm('Are you sure you want to permanently delete all data? This cannot be undone.')) {
+              await clearData();
+              toast.success('All data cleared.');
+            }
+          }}>Clear All Data</Button>
         </Card>
       )}
     </div>

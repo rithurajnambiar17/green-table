@@ -13,15 +13,15 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Sign in — Green Table" },
-      { name: "description", content: "Counter staff sign-in for Green Table snooker and pool club management." },
+      { title: "Sign in — Counter Manager" },
+      { name: "description", content: "Counter staff sign-in for the snooker and pool club management." },
     ],
   }),
   component: LoginPage,
 });
 
 function LoginPage() {
-  const { user, signIn, signUp, authLoading } = useApp();
+  const { user, signIn, signUp, authLoading, settings } = useApp();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -65,7 +65,7 @@ function LoginPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-br from-background/80 via-background/30 to-background/90" />
         <div className="absolute inset-x-0 bottom-0 p-10">
-          <p className="text-[11px] uppercase tracking-[0.4em] text-neon">Green Table</p>
+          <p className="text-[11px] uppercase tracking-[0.4em] text-neon">{settings.clubName}</p>
           <h1 className="mt-3 max-w-md font-display text-4xl leading-tight">
             A premium counter, built for the perfect break.
           </h1>
@@ -83,7 +83,7 @@ function LoginPage() {
               <CircleDot className="h-6 w-6 text-primary-foreground" />
             </div>
             <div>
-              <p className="font-display text-2xl leading-none">Green Table</p>
+              <p className="font-display text-2xl leading-none">{settings.clubName}</p>
               <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Counter Manager</p>
             </div>
           </div>
@@ -138,7 +138,7 @@ function LoginPage() {
             <div className="mb-1 flex items-center gap-1.5 font-medium text-foreground">
               <ShieldCheck className="h-3.5 w-3.5 text-neon" /> Secure cloud auth
             </div>
-            <p>Your data is stored in Lovable Cloud with row-level security. Sessions sync in real time across devices.</p>
+            <p>Your data is stored in the Cloud with row-level security. Sessions sync in real time across devices.</p>
           </div>
         </div>
       </div>

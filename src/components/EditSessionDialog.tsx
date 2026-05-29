@@ -22,9 +22,17 @@ export function EditSessionDialog({ session, open, onOpenChange }: Props) {
   const [adj, setAdj] = useState(0);
   const [rate, setRate] = useState(0);
 
+  const [tick, setTick] = useState(0);
+
   useEffect(() => {
     if (session) { setDiscount(session.discount); setAdj(session.manualAdjustment); setRate(session.hourlyRate); }
   }, [session]);
+
+  useEffect(() => {
+    if (session?.status !== "running") return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [session?.status]);
 
   if (!session) return null;
   const elapsed = sessionElapsedMs(session);

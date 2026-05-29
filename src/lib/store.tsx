@@ -46,6 +46,7 @@ interface AppContextValue extends AppState {
   createTable: (name: string, type: TableType) => Promise<void>;
   updateTable: (id: string, patch: Partial<ClubTable>) => Promise<void>;
   deleteTable: (id: string) => Promise<void>;
+  clearData: () => Promise<void>;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -100,11 +101,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
-  // 1-second tick to refresh live timer rendering for components reading sessionElapsedMs
-  const [, setTick] = useState(0);
+
+  // Fetch settings globally on mount so unauthenticated pages (like login) have access
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => (t + 1) % 1_000_000), 1000);
-    return () => clearInterval(id);
+    supabase.from("settings").select("*").eq("id", 1).maybeSingle().then(({ data }) => {
+      if (data) setSettings(mapSettings(data as DbSettings));
+    });
   }, []);
 
   // ============ Auth ============
@@ -264,7 +266,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       extras_total: 0, total: 0, payment: "unpaid",
     }).select("*").maybeSingle();
     if (!created) return null;
-    return mapSession(created as DbSession, []);
+    const newSession = mapSession(created as DbSession, []);
+    setSessions(prev => [newSession, ...prev]);
+    return newSession;
   }, [tables, customers, settings]);
 
   const pauseSession = useCallback(async (id: string) => {
@@ -276,12 +280,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       run_started_at: null,
       status: "paused",
     }).eq("id", id);
+    setSessions(prev => prev.map(x => x.id === id ? { ...x, accumulatedMs: x.accumulatedMs + add, runStartedAt: null, status: "paused" } : x));
   }, [sessions]);
 
   const resumeSession = useCallback(async (id: string) => {
+    const now = new Date().toISOString();
     await supabase.from("sessions").update({
-      run_started_at: new Date().toISOString(), status: "running",
+      run_started_at: now, status: "running",
     }).eq("id", id);
+    setSessions(prev => prev.map(x => x.id === id ? { ...x, runStartedAt: now, status: "running" } : x));
   }, []);
 
   const endSession: AppContextValue["endSession"] = useCallback(async (id) => {
@@ -301,7 +308,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       status: "ended", ended_at: new Date().toISOString(),
       extras_total: extrasTotal, total,
     }).eq("id", id).select("*").maybeSingle();
-    return data ? mapSession(data as DbSession, s.extras) : undefined;
+    const updated = data ? mapSession(data as DbSession, s.extras) : undefined;
+    if (updated) {
+      setSessions(prev => prev.map(x => x.id === id ? updated : x));
+    }
+    return updated;
   }, [sessions]);
 
   const updateSession: AppContextValue["updateSession"] = useCallback(async (id, patch) => {
@@ -310,11 +321,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (patch.discount !== undefined) dbPatch.discount = patch.discount;
     if (patch.manualAdjustment !== undefined) dbPatch.manual_adjustment = patch.manualAdjustment;
     if (patch.taxRate !== undefined) dbPatch.tax_rate = patch.taxRate;
-    if (Object.keys(dbPatch).length) await supabase.from("sessions").update(dbPatch).eq("id", id);
+    if (Object.keys(dbPatch).length) {
+      await supabase.from("sessions").update(dbPatch).eq("id", id);
+      setSessions(prev => prev.map(x => x.id === id ? { ...x, ...patch } : x));
+    }
   }, []);
 
   const markPaid = useCallback(async (id: string) => {
     await supabase.from("sessions").update({ payment: "paid" }).eq("id", id);
+    setSessions(prev => prev.map(x => x.id === id ? { ...x, payment: "paid" } : x));
   }, []);
 
   // ============ Extras ============
@@ -325,7 +340,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // recompute extras_total
     const s = sessions.find((x) => x.id === sessionId);
     const newExtras = [...(s?.extras ?? []), mapExtra(ins as DbExtra)];
-    await supabase.from("sessions").update({ extras_total: sumExtras(newExtras) }).eq("id", sessionId);
+    const newExtrasTotal = sumExtras(newExtras);
+    await supabase.from("sessions").update({ extras_total: newExtrasTotal }).eq("id", sessionId);
+    setSessions(prev => prev.map(x => x.id === sessionId ? { ...x, extras: newExtras, extrasTotal: newExtrasTotal } : x));
   }, [sessions]);
 
   const removeExtra: AppContextValue["removeExtra"] = useCallback(async (extraId) => {
@@ -333,21 +350,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await supabase.from("session_extras").delete().eq("id", extraId);
     if (s) {
       const newExtras = s.extras.filter((e) => e.id !== extraId);
-      await supabase.from("sessions").update({ extras_total: sumExtras(newExtras) }).eq("id", s.id);
+      const newExtrasTotal = sumExtras(newExtras);
+      await supabase.from("sessions").update({ extras_total: newExtrasTotal }).eq("id", s.id);
+      setSessions(prev => prev.map(x => x.id === s.id ? { ...x, extras: newExtras, extrasTotal: newExtrasTotal } : x));
     }
   }, [sessions]);
+
+  // ============ Clear All Data ============
+  const clearData = useCallback(async () => {
+    // Delete in order: session_extras cascade with sessions, then customers
+    await supabase.from("session_extras").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabase.from("sessions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabase.from("customers").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    setSessions([]);
+    setCustomers([]);
+  }, []);
 
   const value = useMemo<AppContextValue>(
     () => ({
       user, authLoading, loading, tables, customers, sessions, settings,
       signIn, signUp, logout, updateSettings,
       startSession, pauseSession, resumeSession, endSession, updateSession, markPaid,
-      addExtra, removeExtra, createTable, updateTable, deleteTable,
+      addExtra, removeExtra, createTable, updateTable, deleteTable, clearData,
     }),
     [user, authLoading, loading, tables, customers, sessions, settings,
      signIn, signUp, logout, updateSettings,
      startSession, pauseSession, resumeSession, endSession, updateSession, markPaid,
-     addExtra, removeExtra, createTable, updateTable, deleteTable],
+     addExtra, removeExtra, createTable, updateTable, deleteTable, clearData],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
