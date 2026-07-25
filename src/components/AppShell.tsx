@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard, History, Users, BarChart3,
-  Settings as SettingsIcon, LogOut, CircleDot, Menu,
+  Settings as SettingsIcon, LogOut, CircleDot, Menu, Package,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { ThemeToggle } from "./ThemeToggle";
@@ -15,6 +15,7 @@ const NAV = [
   { to: "/dashboard", label: "Live Tables", icon: LayoutDashboard },
   { to: "/sessions", label: "Sessions", icon: History },
   { to: "/customers", label: "Customers", icon: Users },
+  { to: "/inventory", label: "Inventory", icon: Package },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ] as const;

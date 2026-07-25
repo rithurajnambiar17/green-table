@@ -3,8 +3,8 @@ import {
   Play, Pause, Square, CheckCircle2, Pencil, CircleDollarSign,
   MessageCircle, Coffee, ChevronDown, ChevronUp,
 } from "lucide-react";
-import { sessionElapsedMs, useApp } from "@/lib/store";
-import type { ClubTable, Session } from "@/lib/types";
+import { sessionElapsedMs, useApp, rateForType } from "@/lib/store";
+import { TABLE_TYPE_LABEL, type ClubTable, type Session } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -59,7 +59,7 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
     ended: { label: "Ended · Unpaid", className: "bg-destructive text-destructive-foreground" },
   };
 
-  const rate = table.type === "snooker" ? settings.snookerRate : settings.poolRate;
+  const rate = rateForType(table.type, settings);
 
   return (
     <Card
@@ -74,7 +74,7 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,color-mix(in_oklab,white_18%,transparent),transparent_60%)]" />
         <div className="absolute left-5 top-4">
           <Badge variant="outline" className="border-white/30 bg-black/30 text-[10px] uppercase tracking-[0.2em] text-white/90">
-            {table.type === "snooker" ? "Royal Snooker" : "Mini Pool"}
+            {TABLE_TYPE_LABEL[table.type]}
           </Badge>
         </div>
         <div className="absolute bottom-3 left-5 right-5 flex items-end justify-between">
