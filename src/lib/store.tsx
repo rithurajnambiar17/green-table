@@ -408,7 +408,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [inventory]);
   const updateInventoryItem: AppContextValue["updateInventoryItem"] = useCallback(async (id, patch) => {
-    const dbPatch: Record<string, unknown> = {};
+    const dbPatch: { name?: string; category?: string; price?: number; stock?: number; track_stock?: boolean } = {};
     if (patch.name !== undefined) dbPatch.name = patch.name;
     if (patch.category !== undefined) dbPatch.category = patch.category;
     if (patch.price !== undefined) dbPatch.price = patch.price;
