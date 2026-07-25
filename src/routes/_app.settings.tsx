@@ -56,11 +56,14 @@ function SettingsPage() {
           <h2 className="font-display text-xl">Pricing</h2>
           <p className="text-sm text-muted-foreground">Hourly rates per table category and tax.</p>
           <div className="mt-4 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <Field label="Royal Snooker / hr">
                 <Input type="number" value={form.snookerRate} onChange={(e) => setForm({ ...form, snookerRate: +e.target.value || 0 })} disabled={!isAdmin} />
               </Field>
-              <Field label="Mini Pool / hr">
+              <Field label="Mini Snooker / hr">
+                <Input type="number" value={form.miniSnookerRate} onChange={(e) => setForm({ ...form, miniSnookerRate: +e.target.value || 0 })} disabled={!isAdmin} />
+              </Field>
+              <Field label="Pool / hr">
                 <Input type="number" value={form.poolRate} onChange={(e) => setForm({ ...form, poolRate: +e.target.value || 0 })} disabled={!isAdmin} />
               </Field>
             </div>

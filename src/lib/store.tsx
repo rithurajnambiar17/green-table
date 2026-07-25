@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type {
   ClubTable,
   Customer,
+  InventoryItem,
   Session,
   SessionExtra,
   Settings,
@@ -28,6 +29,7 @@ interface AppState {
   customers: Customer[];
   sessions: Session[];
   settings: Settings;
+  inventory: InventoryItem[];
 }
 
 interface AppContextValue extends AppState {
@@ -41,19 +43,23 @@ interface AppContextValue extends AppState {
   endSession: (sessionId: string) => Promise<Session | undefined>;
   updateSession: (sessionId: string, patch: Partial<Session>) => Promise<void>;
   markPaid: (sessionId: string) => Promise<void>;
-  addExtra: (sessionId: string, name: string, price: number, qty: number) => Promise<void>;
+  addExtra: (sessionId: string, name: string, price: number, qty: number, inventoryId?: string) => Promise<void>;
   removeExtra: (extraId: string) => Promise<void>;
   createTable: (name: string, type: TableType) => Promise<void>;
   updateTable: (id: string, patch: Partial<ClubTable>) => Promise<void>;
   deleteTable: (id: string) => Promise<void>;
+  createInventoryItem: (item: Omit<InventoryItem, "id" | "sortOrder">) => Promise<void>;
+  updateInventoryItem: (id: string, patch: Partial<InventoryItem>) => Promise<void>;
+  deleteInventoryItem: (id: string) => Promise<void>;
   clearData: () => Promise<void>;
 }
 
 const DEFAULT_SETTINGS: Settings = {
   clubName: "Green Table",
   currency: "PKR",
-  snookerRate: 600,
-  poolRate: 400,
+  snookerRate: 250,
+  miniSnookerRate: 200,
+  poolRate: 150,
   taxRate: 5,
   countryCode: "+92",
 };
@@ -72,7 +78,8 @@ type DbSession = {
   hourly_rate: number; discount: number; manual_adjustment: number; tax_rate: number;
   extras_total: number; total: number; payment: string;
 };
-type DbSettings = { id: number; club_name: string; currency: string; snooker_rate: number; pool_rate: number; tax_rate: number; country_code: string };
+type DbSettings = { id: number; club_name: string; currency: string; snooker_rate: number; mini_snooker_rate: number | null; pool_rate: number; tax_rate: number; country_code: string };
+type DbInventory = { id: string; name: string; category: string; price: number; stock: number; track_stock: boolean; sort_order: number };
 
 const mapTable = (r: DbTable): ClubTable => ({ id: r.id, name: r.name, type: r.type as TableType, active: r.active, sortOrder: r.sort_order });
 const mapCustomer = (r: DbCustomer): Customer => ({ id: r.id, name: r.name, phone: r.phone, visits: r.visits, lastVisit: r.last_visit });
@@ -88,9 +95,21 @@ const mapSession = (r: DbSession, extras: SessionExtra[]): Session => ({
 });
 const mapSettings = (r: DbSettings): Settings => ({
   clubName: r.club_name, currency: r.currency,
-  snookerRate: Number(r.snooker_rate), poolRate: Number(r.pool_rate),
+  snookerRate: Number(r.snooker_rate),
+  miniSnookerRate: Number(r.mini_snooker_rate ?? 200),
+  poolRate: Number(r.pool_rate),
   taxRate: Number(r.tax_rate), countryCode: r.country_code,
 });
+const mapInventory = (r: DbInventory): InventoryItem => ({
+  id: r.id, name: r.name, category: r.category,
+  price: Number(r.price), stock: r.stock, trackStock: r.track_stock, sortOrder: r.sort_order,
+});
+
+export function rateForType(t: TableType, s: Settings): number {
+  if (t === "snooker") return s.snookerRate;
+  if (t === "mini_snooker") return s.miniSnookerRate;
+  return s.poolRate;
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -100,6 +119,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
 
   // Fetch settings globally on mount so unauthenticated pages (like login) have access
@@ -148,12 +168,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ============ Data loaders ============
   const loadAll = useCallback(async () => {
     setLoading(true);
-    const [tablesRes, customersRes, sessionsRes, extrasRes, settingsRes] = await Promise.all([
+    const [tablesRes, customersRes, sessionsRes, extrasRes, settingsRes, inventoryRes] = await Promise.all([
       supabase.from("club_tables").select("*").order("sort_order"),
       supabase.from("customers").select("*").order("last_visit", { ascending: false, nullsFirst: false }),
       supabase.from("sessions").select("*").order("started_at", { ascending: false }).limit(500),
       supabase.from("session_extras").select("*"),
       supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
+      supabase.from("inventory_items").select("*").order("sort_order"),
     ]);
     setTables((tablesRes.data ?? []).map((r) => mapTable(r as DbTable)));
     setCustomers((customersRes.data ?? []).map((r) => mapCustomer(r as DbCustomer)));
@@ -164,6 +185,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setSessions((sessionsRes.data ?? []).map((r) => mapSession(r as DbSession, extrasByS.get((r as DbSession).id) ?? [])));
     if (settingsRes.data) setSettings(mapSettings(settingsRes.data as DbSettings));
+    setInventory((inventoryRes.data ?? []).map((r) => mapInventory(r as DbInventory)));
     setLoading(false);
   }, []);
 
@@ -182,6 +204,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "club_tables" }, () => loadAll())
       .on("postgres_changes", { event: "*", schema: "public", table: "settings" }, () => loadAll())
       .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, () => loadAll())
+      .on("postgres_changes", { event: "*", schema: "public", table: "inventory_items" }, () => loadAll())
       .subscribe();
 
     return () => { supabase.removeChannel(ch); };
@@ -213,7 +236,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSettings(next);
     await supabase.from("settings").update({
       club_name: next.clubName, currency: next.currency,
-      snooker_rate: next.snookerRate, pool_rate: next.poolRate,
+      snooker_rate: next.snookerRate,
+      mini_snooker_rate: next.miniSnookerRate,
+      pool_rate: next.poolRate,
       tax_rate: next.taxRate, country_code: next.countryCode,
     }).eq("id", 1);
   }, [settings]);
@@ -238,7 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const startSession: AppContextValue["startSession"] = useCallback(async ({ tableId, customerName, customerPhone }) => {
     const table = tables.find((t) => t.id === tableId);
     if (!table) return null;
-    const rate = table.type === "snooker" ? settings.snookerRate : settings.poolRate;
+    const rate = rateForType(table.type, settings);
 
     // upsert customer
     const existing = customers.find((c) => c.phone === customerPhone);
@@ -333,17 +358,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ============ Extras ============
-  const addExtra: AppContextValue["addExtra"] = useCallback(async (sessionId, name, price, qty) => {
+  const addExtra: AppContextValue["addExtra"] = useCallback(async (sessionId, name, price, qty, inventoryId) => {
+    // If tied to an inventory item, decrement stock (if tracked)
+    if (inventoryId) {
+      const inv = inventory.find((i) => i.id === inventoryId);
+      if (inv?.trackStock) {
+        if (inv.stock < qty) { throw new Error(`Only ${inv.stock} ${inv.name} in stock`); }
+        await supabase.from("inventory_items").update({ stock: inv.stock - qty }).eq("id", inventoryId);
+        setInventory(prev => prev.map(i => i.id === inventoryId ? { ...i, stock: i.stock - qty } : i));
+      }
+    }
     const { data: ins } = await supabase.from("session_extras")
       .insert({ session_id: sessionId, name, price, qty }).select("*").maybeSingle();
     if (!ins) return;
-    // recompute extras_total
     const s = sessions.find((x) => x.id === sessionId);
     const newExtras = [...(s?.extras ?? []), mapExtra(ins as DbExtra)];
     const newExtrasTotal = sumExtras(newExtras);
     await supabase.from("sessions").update({ extras_total: newExtrasTotal }).eq("id", sessionId);
     setSessions(prev => prev.map(x => x.id === sessionId ? { ...x, extras: newExtras, extrasTotal: newExtrasTotal } : x));
-  }, [sessions]);
+  }, [sessions, inventory]);
 
   const removeExtra: AppContextValue["removeExtra"] = useCallback(async (extraId) => {
     const s = sessions.find((x) => x.extras.some((e) => e.id === extraId));
@@ -366,17 +399,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCustomers([]);
   }, []);
 
+  // ============ Inventory ============
+  const createInventoryItem: AppContextValue["createInventoryItem"] = useCallback(async (item) => {
+    const maxOrder = inventory.reduce((a, i) => Math.max(a, i.sortOrder), 0);
+    await supabase.from("inventory_items").insert({
+      name: item.name, category: item.category, price: item.price,
+      stock: item.stock, track_stock: item.trackStock, sort_order: maxOrder + 1,
+    });
+  }, [inventory]);
+  const updateInventoryItem: AppContextValue["updateInventoryItem"] = useCallback(async (id, patch) => {
+    const dbPatch: { name?: string; category?: string; price?: number; stock?: number; track_stock?: boolean } = {};
+    if (patch.name !== undefined) dbPatch.name = patch.name;
+    if (patch.category !== undefined) dbPatch.category = patch.category;
+    if (patch.price !== undefined) dbPatch.price = patch.price;
+    if (patch.stock !== undefined) dbPatch.stock = patch.stock;
+    if (patch.trackStock !== undefined) dbPatch.track_stock = patch.trackStock;
+    await supabase.from("inventory_items").update(dbPatch).eq("id", id);
+    setInventory(prev => prev.map(i => i.id === id ? { ...i, ...patch } : i));
+  }, []);
+  const deleteInventoryItem: AppContextValue["deleteInventoryItem"] = useCallback(async (id) => {
+    await supabase.from("inventory_items").delete().eq("id", id);
+    setInventory(prev => prev.filter(i => i.id !== id));
+  }, []);
+
   const value = useMemo<AppContextValue>(
     () => ({
-      user, authLoading, loading, tables, customers, sessions, settings,
+      user, authLoading, loading, tables, customers, sessions, settings, inventory,
       signIn, signUp, logout, updateSettings,
       startSession, pauseSession, resumeSession, endSession, updateSession, markPaid,
-      addExtra, removeExtra, createTable, updateTable, deleteTable, clearData,
+      addExtra, removeExtra, createTable, updateTable, deleteTable,
+      createInventoryItem, updateInventoryItem, deleteInventoryItem, clearData,
     }),
-    [user, authLoading, loading, tables, customers, sessions, settings,
+    [user, authLoading, loading, tables, customers, sessions, settings, inventory,
      signIn, signUp, logout, updateSettings,
      startSession, pauseSession, resumeSession, endSession, updateSession, markPaid,
-     addExtra, removeExtra, createTable, updateTable, deleteTable, clearData],
+     addExtra, removeExtra, createTable, updateTable, deleteTable,
+     createInventoryItem, updateInventoryItem, deleteInventoryItem, clearData],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

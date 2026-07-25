@@ -51,7 +51,8 @@ export function TableManager() {
         <Select value={type} onValueChange={(v) => setType(v as TableType)}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="snooker">Snooker</SelectItem>
+            <SelectItem value="snooker">Royal Snooker</SelectItem>
+            <SelectItem value="mini_snooker">Mini Snooker</SelectItem>
             <SelectItem value="pool">Pool</SelectItem>
           </SelectContent>
         </Select>
@@ -65,9 +66,10 @@ export function TableManager() {
               <>
                 <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className="h-8 flex-1" />
                 <Select value={draft.type} onValueChange={(v) => setDraft({ ...draft, type: v as TableType })}>
-                  <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-8 w-36"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="snooker">Snooker</SelectItem>
+                    <SelectItem value="snooker">Royal Snooker</SelectItem>
+                    <SelectItem value="mini_snooker">Mini Snooker</SelectItem>
                     <SelectItem value="pool">Pool</SelectItem>
                   </SelectContent>
                 </Select>
@@ -77,7 +79,7 @@ export function TableManager() {
             ) : (
               <>
                 <span className="flex-1">{t.name}</span>
-                <Badge variant="outline" className="capitalize">{t.type}</Badge>
+                <Badge variant="outline" className="capitalize">{t.type.replace("_", " ")}</Badge>
                 <Button size="icon" variant="ghost" onClick={() => startEdit(t)} aria-label="Edit"><Pencil className="h-4 w-4" /></Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>

@@ -1,20 +1,15 @@
 import { useState } from "react";
-import { Plus, Trash2, Coffee, Cigarette, GlassWater, Cookie } from "lucide-react";
+import { Plus, Trash2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useApp } from "@/lib/store";
 import { formatCurrency } from "@/lib/format";
 import type { Session } from "@/lib/types";
-
-const QUICK_ITEMS = [
-  { name: "Tea", price: 80, icon: Coffee },
-  { name: "Cigarette", price: 30, icon: Cigarette },
-  { name: "Soft Drink", price: 120, icon: GlassWater },
-  { name: "Snacks", price: 150, icon: Cookie },
-] as const;
+import { toast } from "sonner";
 
 export function ExtrasManager({ session, compact = false }: { session: Session; compact?: boolean }) {
-  const { addExtra, removeExtra, settings } = useApp();
+  const { addExtra, removeExtra, settings, inventory } = useApp();
   const [name, setName] = useState("");
   const [price, setPrice] = useState<string>("");
   const [qty, setQty] = useState(1);
@@ -22,35 +17,55 @@ export function ExtrasManager({ session, compact = false }: { session: Session; 
   const submit = async () => {
     const p = Number(price);
     if (!name.trim() || !p || p <= 0 || qty <= 0) return;
-    await addExtra(session.id, name.trim(), p, qty);
-    setName(""); setPrice(""); setQty(1);
+    try {
+      await addExtra(session.id, name.trim(), p, qty);
+      setName(""); setPrice(""); setQty(1);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add"); }
+  };
+
+  const quickAdd = async (itemId: string, name: string, price: number) => {
+    try {
+      await addExtra(session.id, name, price, 1, itemId);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add"); }
   };
 
   return (
     <div className="space-y-3">
       {!compact && (
-        <div className="flex flex-wrap gap-2">
-          {QUICK_ITEMS.map((q) => {
-            const Icon = q.icon;
-            return (
-              <Button
-                key={q.name}
-                size="sm"
-                variant="outline"
-                onClick={() => addExtra(session.id, q.name, q.price, 1)}
-                className="h-8"
-              >
-                <Icon className="mr-1.5 h-3.5 w-3.5" />
-                {q.name} · {formatCurrency(q.price, settings.currency)}
-                <Plus className="ml-1 h-3 w-3" />
-              </Button>
-            );
-          })}
+        <div className="space-y-2">
+          {inventory.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No inventory items yet. Ask an admin to add products in Inventory.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {inventory.map((item) => {
+                const out = item.trackStock && item.stock <= 0;
+                return (
+                  <Button
+                    key={item.id}
+                    size="sm"
+                    variant="outline"
+                    disabled={out}
+                    onClick={() => quickAdd(item.id, item.name, item.price)}
+                    className="h-8"
+                  >
+                    <Package className="mr-1.5 h-3.5 w-3.5" />
+                    {item.name} · {formatCurrency(item.price, settings.currency)}
+                    {item.trackStock && (
+                      <Badge variant="outline" className="ml-1.5 h-4 px-1 text-[10px]">
+                        {out ? "out" : item.stock}
+                      </Badge>
+                    )}
+                    {!out && <Plus className="ml-1 h-3 w-3" />}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
       <div className="grid grid-cols-[1fr_90px_70px_auto] gap-2">
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Item name" className="h-8" />
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Custom item" className="h-8" />
         <Input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} placeholder="Price" className="h-8" inputMode="decimal" />
         <Input value={qty} onChange={(e) => setQty(Math.max(1, +e.target.value || 1))} type="number" min={1} className="h-8" />
         <Button size="sm" onClick={submit} className="h-8"><Plus className="h-3.5 w-3.5" /></Button>

@@ -6,7 +6,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import type { ClubTable } from "@/lib/types";
+import { TABLE_TYPE_LABEL, type ClubTable } from "@/lib/types";
 import { toast } from "sonner";
 
 interface Props {
@@ -41,7 +41,7 @@ export function StartSessionDialog({ table, open, onOpenChange }: Props) {
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Start session — {table?.name}</DialogTitle>
           <DialogDescription>
-            Enter player details to begin live billing on this {table?.type === "snooker" ? "Royal Snooker" : "Mini Pool"} table.
+            Enter player details to begin live billing on this {table ? TABLE_TYPE_LABEL[table.type] : ""} table.
           </DialogDescription>
         </DialogHeader>
 

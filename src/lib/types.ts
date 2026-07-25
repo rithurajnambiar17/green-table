@@ -1,4 +1,4 @@
-export type TableType = "snooker" | "pool";
+export type TableType = "snooker" | "mini_snooker" | "pool";
 export type SessionStatus = "running" | "paused" | "ended";
 export type PaymentStatus = "unpaid" | "paid";
 export type Role = "admin" | "staff";
@@ -55,9 +55,20 @@ export interface Settings {
   clubName: string;
   currency: string;
   snookerRate: number;
+  miniSnookerRate: number;
   poolRate: number;
   taxRate: number;
   countryCode: string;
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  stock: number;
+  trackStock: boolean;
+  sortOrder: number;
 }
 
 export interface User {
@@ -66,3 +77,9 @@ export interface User {
   email: string;
   role: Role;
 }
+
+export const TABLE_TYPE_LABEL: Record<TableType, string> = {
+  snooker: "Royal Snooker",
+  mini_snooker: "Mini Snooker",
+  pool: "Pool",
+};
