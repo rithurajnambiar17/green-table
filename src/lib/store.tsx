@@ -358,17 +358,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ============ Extras ============
-  const addExtra: AppContextValue["addExtra"] = useCallback(async (sessionId, name, price, qty) => {
+  const addExtra: AppContextValue["addExtra"] = useCallback(async (sessionId, name, price, qty, inventoryId) => {
+    // If tied to an inventory item, decrement stock (if tracked)
+    if (inventoryId) {
+      const inv = inventory.find((i) => i.id === inventoryId);
+      if (inv?.trackStock) {
+        if (inv.stock < qty) { throw new Error(`Only ${inv.stock} ${inv.name} in stock`); }
+        await supabase.from("inventory_items").update({ stock: inv.stock - qty }).eq("id", inventoryId);
+        setInventory(prev => prev.map(i => i.id === inventoryId ? { ...i, stock: i.stock - qty } : i));
+      }
+    }
     const { data: ins } = await supabase.from("session_extras")
       .insert({ session_id: sessionId, name, price, qty }).select("*").maybeSingle();
     if (!ins) return;
-    // recompute extras_total
     const s = sessions.find((x) => x.id === sessionId);
     const newExtras = [...(s?.extras ?? []), mapExtra(ins as DbExtra)];
     const newExtrasTotal = sumExtras(newExtras);
     await supabase.from("sessions").update({ extras_total: newExtrasTotal }).eq("id", sessionId);
     setSessions(prev => prev.map(x => x.id === sessionId ? { ...x, extras: newExtras, extrasTotal: newExtrasTotal } : x));
-  }, [sessions]);
+  }, [sessions, inventory]);
 
   const removeExtra: AppContextValue["removeExtra"] = useCallback(async (extraId) => {
     const s = sessions.find((x) => x.extras.some((e) => e.id === extraId));
@@ -391,17 +399,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCustomers([]);
   }, []);
 
+  // ============ Inventory ============
+  const createInventoryItem: AppContextValue["createInventoryItem"] = useCallback(async (item) => {
+    const maxOrder = inventory.reduce((a, i) => Math.max(a, i.sortOrder), 0);
+    await supabase.from("inventory_items").insert({
+      name: item.name, category: item.category, price: item.price,
+      stock: item.stock, track_stock: item.trackStock, sort_order: maxOrder + 1,
+    });
+  }, [inventory]);
+  const updateInventoryItem: AppContextValue["updateInventoryItem"] = useCallback(async (id, patch) => {
+    const dbPatch: Record<string, unknown> = {};
+    if (patch.name !== undefined) dbPatch.name = patch.name;
+    if (patch.category !== undefined) dbPatch.category = patch.category;
+    if (patch.price !== undefined) dbPatch.price = patch.price;
+    if (patch.stock !== undefined) dbPatch.stock = patch.stock;
+    if (patch.trackStock !== undefined) dbPatch.track_stock = patch.trackStock;
+    await supabase.from("inventory_items").update(dbPatch).eq("id", id);
+    setInventory(prev => prev.map(i => i.id === id ? { ...i, ...patch } : i));
+  }, []);
+  const deleteInventoryItem: AppContextValue["deleteInventoryItem"] = useCallback(async (id) => {
+    await supabase.from("inventory_items").delete().eq("id", id);
+    setInventory(prev => prev.filter(i => i.id !== id));
+  }, []);
+
   const value = useMemo<AppContextValue>(
     () => ({
-      user, authLoading, loading, tables, customers, sessions, settings,
+      user, authLoading, loading, tables, customers, sessions, settings, inventory,
       signIn, signUp, logout, updateSettings,
       startSession, pauseSession, resumeSession, endSession, updateSession, markPaid,
-      addExtra, removeExtra, createTable, updateTable, deleteTable, clearData,
+      addExtra, removeExtra, createTable, updateTable, deleteTable,
+      createInventoryItem, updateInventoryItem, deleteInventoryItem, clearData,
     }),
-    [user, authLoading, loading, tables, customers, sessions, settings,
+    [user, authLoading, loading, tables, customers, sessions, settings, inventory,
      signIn, signUp, logout, updateSettings,
      startSession, pauseSession, resumeSession, endSession, updateSession, markPaid,
-     addExtra, removeExtra, createTable, updateTable, deleteTable, clearData],
+     addExtra, removeExtra, createTable, updateTable, deleteTable,
+     createInventoryItem, updateInventoryItem, deleteInventoryItem, clearData],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
