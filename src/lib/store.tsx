@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type {
   ClubTable,
   Customer,
+  InventoryItem,
   Session,
   SessionExtra,
   Settings,
@@ -28,6 +29,7 @@ interface AppState {
   customers: Customer[];
   sessions: Session[];
   settings: Settings;
+  inventory: InventoryItem[];
 }
 
 interface AppContextValue extends AppState {
@@ -41,19 +43,23 @@ interface AppContextValue extends AppState {
   endSession: (sessionId: string) => Promise<Session | undefined>;
   updateSession: (sessionId: string, patch: Partial<Session>) => Promise<void>;
   markPaid: (sessionId: string) => Promise<void>;
-  addExtra: (sessionId: string, name: string, price: number, qty: number) => Promise<void>;
+  addExtra: (sessionId: string, name: string, price: number, qty: number, inventoryId?: string) => Promise<void>;
   removeExtra: (extraId: string) => Promise<void>;
   createTable: (name: string, type: TableType) => Promise<void>;
   updateTable: (id: string, patch: Partial<ClubTable>) => Promise<void>;
   deleteTable: (id: string) => Promise<void>;
+  createInventoryItem: (item: Omit<InventoryItem, "id" | "sortOrder">) => Promise<void>;
+  updateInventoryItem: (id: string, patch: Partial<InventoryItem>) => Promise<void>;
+  deleteInventoryItem: (id: string) => Promise<void>;
   clearData: () => Promise<void>;
 }
 
 const DEFAULT_SETTINGS: Settings = {
   clubName: "Green Table",
   currency: "PKR",
-  snookerRate: 600,
-  poolRate: 400,
+  snookerRate: 250,
+  miniSnookerRate: 200,
+  poolRate: 150,
   taxRate: 5,
   countryCode: "+92",
 };
@@ -72,7 +78,8 @@ type DbSession = {
   hourly_rate: number; discount: number; manual_adjustment: number; tax_rate: number;
   extras_total: number; total: number; payment: string;
 };
-type DbSettings = { id: number; club_name: string; currency: string; snooker_rate: number; pool_rate: number; tax_rate: number; country_code: string };
+type DbSettings = { id: number; club_name: string; currency: string; snooker_rate: number; mini_snooker_rate: number | null; pool_rate: number; tax_rate: number; country_code: string };
+type DbInventory = { id: string; name: string; category: string; price: number; stock: number; track_stock: boolean; sort_order: number };
 
 const mapTable = (r: DbTable): ClubTable => ({ id: r.id, name: r.name, type: r.type as TableType, active: r.active, sortOrder: r.sort_order });
 const mapCustomer = (r: DbCustomer): Customer => ({ id: r.id, name: r.name, phone: r.phone, visits: r.visits, lastVisit: r.last_visit });
@@ -88,9 +95,21 @@ const mapSession = (r: DbSession, extras: SessionExtra[]): Session => ({
 });
 const mapSettings = (r: DbSettings): Settings => ({
   clubName: r.club_name, currency: r.currency,
-  snookerRate: Number(r.snooker_rate), poolRate: Number(r.pool_rate),
+  snookerRate: Number(r.snooker_rate),
+  miniSnookerRate: Number(r.mini_snooker_rate ?? 200),
+  poolRate: Number(r.pool_rate),
   taxRate: Number(r.tax_rate), countryCode: r.country_code,
 });
+const mapInventory = (r: DbInventory): InventoryItem => ({
+  id: r.id, name: r.name, category: r.category,
+  price: Number(r.price), stock: r.stock, trackStock: r.track_stock, sortOrder: r.sort_order,
+});
+
+export function rateForType(t: TableType, s: Settings): number {
+  if (t === "snooker") return s.snookerRate;
+  if (t === "mini_snooker") return s.miniSnookerRate;
+  return s.poolRate;
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
