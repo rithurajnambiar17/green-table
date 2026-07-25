@@ -14,6 +14,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppSessionsRouteImport } from './routes/_app.sessions'
+import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
@@ -42,6 +43,11 @@ const AppSessionsRoute = AppSessionsRouteImport.update({
   path: '/sessions',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInventoryRoute = AppInventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AppAnalyticsRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
+  '/inventory': typeof AppInventoryRoute
   '/sessions': typeof AppSessionsRoute
   '/settings': typeof AppSettingsRoute
 }
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AppAnalyticsRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
+  '/inventory': typeof AppInventoryRoute
   '/sessions': typeof AppSessionsRoute
   '/settings': typeof AppSettingsRoute
 }
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/inventory': typeof AppInventoryRoute
   '/_app/sessions': typeof AppSessionsRoute
   '/_app/settings': typeof AppSettingsRoute
 }
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/customers'
     | '/dashboard'
+    | '/inventory'
     | '/sessions'
     | '/settings'
   fileRoutesByTo: FileRoutesByTo
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/customers'
     | '/dashboard'
+    | '/inventory'
     | '/sessions'
     | '/settings'
   id:
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/_app/analytics'
     | '/_app/customers'
     | '/_app/dashboard'
+    | '/_app/inventory'
     | '/_app/sessions'
     | '/_app/settings'
   fileRoutesById: FileRoutesById
@@ -161,6 +173,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSessionsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/inventory': {
+      id: '/_app/inventory'
+      path: '/inventory'
+      fullPath: '/inventory'
+      preLoaderRoute: typeof AppInventoryRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -189,6 +208,7 @@ interface AppRouteChildren {
   AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppCustomersRoute: typeof AppCustomersRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppInventoryRoute: typeof AppInventoryRoute
   AppSessionsRoute: typeof AppSessionsRoute
   AppSettingsRoute: typeof AppSettingsRoute
 }
@@ -197,6 +217,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAnalyticsRoute: AppAnalyticsRoute,
   AppCustomersRoute: AppCustomersRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppInventoryRoute: AppInventoryRoute,
   AppSessionsRoute: AppSessionsRoute,
   AppSettingsRoute: AppSettingsRoute,
 }
