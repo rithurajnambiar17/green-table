@@ -68,6 +68,42 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_items: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          name: string
+          price: number
+          sort_order: number
+          stock: number
+          track_stock: boolean
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          name: string
+          price?: number
+          sort_order?: number
+          stock?: number
+          track_stock?: boolean
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          name?: string
+          price?: number
+          sort_order?: number
+          stock?: number
+          track_stock?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -214,6 +250,7 @@ export type Database = {
           country_code: string
           currency: string
           id: number
+          mini_snooker_rate: number
           pool_rate: number
           snooker_rate: number
           tax_rate: number
@@ -224,6 +261,7 @@ export type Database = {
           country_code?: string
           currency?: string
           id?: number
+          mini_snooker_rate?: number
           pool_rate?: number
           snooker_rate?: number
           tax_rate?: number
@@ -234,6 +272,7 @@ export type Database = {
           country_code?: string
           currency?: string
           id?: number
+          mini_snooker_rate?: number
           pool_rate?: number
           snooker_rate?: number
           tax_rate?: number
