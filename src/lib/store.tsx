@@ -119,6 +119,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
 
   // Fetch settings globally on mount so unauthenticated pages (like login) have access
@@ -167,12 +168,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ============ Data loaders ============
   const loadAll = useCallback(async () => {
     setLoading(true);
-    const [tablesRes, customersRes, sessionsRes, extrasRes, settingsRes] = await Promise.all([
+    const [tablesRes, customersRes, sessionsRes, extrasRes, settingsRes, inventoryRes] = await Promise.all([
       supabase.from("club_tables").select("*").order("sort_order"),
       supabase.from("customers").select("*").order("last_visit", { ascending: false, nullsFirst: false }),
       supabase.from("sessions").select("*").order("started_at", { ascending: false }).limit(500),
       supabase.from("session_extras").select("*"),
       supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
+      supabase.from("inventory_items").select("*").order("sort_order"),
     ]);
     setTables((tablesRes.data ?? []).map((r) => mapTable(r as DbTable)));
     setCustomers((customersRes.data ?? []).map((r) => mapCustomer(r as DbCustomer)));
@@ -183,6 +185,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setSessions((sessionsRes.data ?? []).map((r) => mapSession(r as DbSession, extrasByS.get((r as DbSession).id) ?? [])));
     if (settingsRes.data) setSettings(mapSettings(settingsRes.data as DbSettings));
+    setInventory((inventoryRes.data ?? []).map((r) => mapInventory(r as DbInventory)));
     setLoading(false);
   }, []);
 
@@ -201,6 +204,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "club_tables" }, () => loadAll())
       .on("postgres_changes", { event: "*", schema: "public", table: "settings" }, () => loadAll())
       .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, () => loadAll())
+      .on("postgres_changes", { event: "*", schema: "public", table: "inventory_items" }, () => loadAll())
       .subscribe();
 
     return () => { supabase.removeChannel(ch); };
@@ -232,7 +236,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSettings(next);
     await supabase.from("settings").update({
       club_name: next.clubName, currency: next.currency,
-      snooker_rate: next.snookerRate, pool_rate: next.poolRate,
+      snooker_rate: next.snookerRate,
+      mini_snooker_rate: next.miniSnookerRate,
+      pool_rate: next.poolRate,
       tax_rate: next.taxRate, country_code: next.countryCode,
     }).eq("id", 1);
   }, [settings]);
@@ -257,7 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const startSession: AppContextValue["startSession"] = useCallback(async ({ tableId, customerName, customerPhone }) => {
     const table = tables.find((t) => t.id === tableId);
     if (!table) return null;
-    const rate = table.type === "snooker" ? settings.snookerRate : settings.poolRate;
+    const rate = rateForType(table.type, settings);
 
     // upsert customer
     const existing = customers.find((c) => c.phone === customerPhone);
