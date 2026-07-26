@@ -7,6 +7,12 @@ import { useApp } from "@/lib/store";
 import { formatCurrency } from "@/lib/format";
 import type { Session } from "@/lib/types";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function ExtrasManager({ session, compact = false }: { session: Session; compact?: boolean }) {
   const { addExtra, removeExtra, settings, inventory } = useApp();
@@ -37,28 +43,45 @@ export function ExtrasManager({ session, compact = false }: { session: Session; 
             <p className="text-xs text-muted-foreground">No inventory items yet. Ask an admin to add products in Inventory.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {inventory.map((item) => {
-                const out = item.trackStock && item.stock <= 0;
-                return (
-                  <Button
-                    key={item.id}
-                    size="sm"
-                    variant="outline"
-                    disabled={out}
-                    onClick={() => quickAdd(item.id, item.name, item.price)}
-                    className="h-8"
-                  >
-                    <Package className="mr-1.5 h-3.5 w-3.5" />
-                    {item.name} · {formatCurrency(item.price, settings.currency)}
-                    {item.trackStock && (
-                      <Badge variant="outline" className="ml-1.5 h-4 px-1 text-[10px]">
-                        {out ? "out" : item.stock}
-                      </Badge>
-                    )}
-                    {!out && <Plus className="ml-1 h-3 w-3" />}
-                  </Button>
-                );
-              })}
+              {Object.entries(
+                inventory.reduce((acc, item) => {
+                  if (!acc[item.category]) acc[item.category] = [];
+                  acc[item.category].push(item);
+                  return acc;
+                }, {} as Record<string, typeof inventory>)
+              ).map(([category, items]) => (
+                <DropdownMenu key={category}>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-8 capitalize">
+                      <Package className="mr-1.5 h-3.5 w-3.5" />
+                      {category}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {items.map((item) => {
+                      const out = item.trackStock && item.stock <= 0;
+                      return (
+                        <DropdownMenuItem
+                          key={item.id}
+                          disabled={out}
+                          onClick={() => quickAdd(item.id, item.name, item.price)}
+                          className="flex items-center justify-between gap-4 cursor-pointer"
+                        >
+                          <span>{item.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">{formatCurrency(item.price, settings.currency)}</span>
+                            {item.trackStock && (
+                              <Badge variant="outline" className={out ? "bg-destructive text-destructive-foreground h-4 px-1 text-[10px]" : "h-4 px-1 text-[10px]"}>
+                                {out ? "out" : item.stock}
+                              </Badge>
+                            )}
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ))}
             </div>
           )}
         </div>

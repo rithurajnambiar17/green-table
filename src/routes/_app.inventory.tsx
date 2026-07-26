@@ -28,7 +28,13 @@ export const Route = createFileRoute("/_app/inventory")({
   component: InventoryPage,
 });
 
-const CATEGORIES = ["beverage", "tobacco", "food", "other"] as const;
+const CATEGORIES = ["beverage", "food", "other", "tobacco"] as const;
+const CATEGORY_LABELS: Record<string, string> = {
+  beverage: "Cafe - Beverage",
+  food: "Cafe - Food",
+  other: "Cafe - Other",
+  tobacco: "Pool - Cigarettes/Tobacco",
+};
 
 function InventoryPage() {
   const { inventory, createInventoryItem, updateInventoryItem, deleteInventoryItem, settings, user } = useApp();
@@ -42,6 +48,7 @@ function InventoryPage() {
 
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<InventoryItem>>({});
+  const [activeTab, setActiveTab] = useState<"cafe" | "pool">("cafe");
 
   const add = async () => {
     if (!name.trim()) { toast.error("Name required"); return; }
@@ -110,7 +117,7 @@ function InventoryPage() {
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
+                {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>)}
               </SelectContent>
             </Select>
             <Input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} placeholder="Price" inputMode="decimal" />
@@ -125,17 +132,31 @@ function InventoryPage() {
       )}
 
       <Card className="glass p-0">
-        <div className="border-b border-border/60 px-6 py-4">
+        <div className="border-b border-border/60 px-6 py-4 flex items-center justify-between">
           <h2 className="font-display text-xl">Products</h2>
+          <div className="flex bg-muted p-1 rounded-md">
+            <button
+              onClick={() => setActiveTab("cafe")}
+              className={`px-3 py-1 text-sm rounded-md transition-colors ${activeTab === "cafe" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Cafe Items
+            </button>
+            <button
+              onClick={() => setActiveTab("pool")}
+              className={`px-3 py-1 text-sm rounded-md transition-colors ${activeTab === "pool" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Pool Items
+            </button>
+          </div>
         </div>
-        {inventory.length === 0 ? (
+        {inventory.filter((i) => activeTab === "cafe" ? i.category !== "tobacco" : i.category === "tobacco").length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             <Package className="mx-auto mb-2 h-6 w-6 opacity-60" />
-            No inventory items yet.
+            No items in this category.
           </div>
         ) : (
           <ul className="divide-y divide-border/60">
-            {inventory.map((i) => {
+            {inventory.filter((i) => activeTab === "cafe" ? i.category !== "tobacco" : i.category === "tobacco").map((i) => {
               const out = i.trackStock && i.stock <= 0;
               const low = i.trackStock && i.stock > 0 && i.stock <= 5;
               return (
@@ -144,9 +165,9 @@ function InventoryPage() {
                     <>
                       <Input className="h-8 flex-1 min-w-[150px]" value={draft.name ?? ""} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
                       <Select value={draft.category ?? "other"} onValueChange={(v) => setDraft({ ...draft, category: v })}>
-                        <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-8 w-40"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {CATEGORIES.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
+                          {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       <Input className="h-8 w-24" type="number" value={draft.price ?? 0} onChange={(e) => setDraft({ ...draft, price: +e.target.value || 0 })} />
@@ -162,7 +183,7 @@ function InventoryPage() {
                     <>
                       <div className="flex-1 min-w-[160px]">
                         <p className="font-medium">{i.name}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{i.category}</p>
+                        <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[i.category] || i.category}</p>
                       </div>
                       <span className="w-24 text-right tabular-nums">{formatCurrency(i.price, settings.currency)}</span>
                       {i.trackStock ? (

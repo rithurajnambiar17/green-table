@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { TableHistoryDialog } from "@/components/TableHistoryDialog";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -27,8 +29,24 @@ export const Route = createFileRoute("/_app/analytics")({
 
 function AnalyticsPage() {
   const { sessions, settings, tables } = useApp();
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [historyTable, setHistoryTable] = useState<string | null>(null);
 
-  const paid = sessions.filter((s) => s.payment === "paid" && s.endedAt);
+  const allPaid = sessions.filter((s) => s.payment === "paid" && s.endedAt);
+  const paid = useMemo(() => {
+    let list = allPaid;
+    if (startDate) {
+      const sDate = new Date(startDate);
+      list = list.filter(s => new Date(s.endedAt!) >= sDate);
+    }
+    if (endDate) {
+      const eDate = new Date(endDate);
+      eDate.setHours(23, 59, 59, 999);
+      list = list.filter(s => new Date(s.endedAt!) <= eDate);
+    }
+    return list;
+  }, [allPaid, startDate, endDate]);
 
   const now = new Date();
   const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
@@ -36,13 +54,19 @@ function AnalyticsPage() {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-  const sumIn = (since: Date) => paid.filter((s) => new Date(s.endedAt!) >= since).reduce((a, b) => a + b.total, 0);
+  const getKpiData = (since: Date) => {
+    const subset = paid.filter((s) => new Date(s.endedAt!) >= since);
+    const total = subset.reduce((a, b) => a + b.total, 0);
+    const cafe = subset.reduce((a, b) => a + (b.extrasTotal || 0), 0);
+    const table = total - cafe;
+    return { total, cafe, table };
+  };
 
   const kpis = [
-    { label: "Today", value: sumIn(startOfDay) },
-    { label: "This Week", value: sumIn(startOfWeek) },
-    { label: "This Month", value: sumIn(startOfMonth) },
-    { label: "This Year", value: sumIn(startOfYear) },
+    { label: "Today", ...getKpiData(startOfDay) },
+    { label: "This Week", ...getKpiData(startOfWeek) },
+    { label: "This Month", ...getKpiData(startOfMonth) },
+    { label: "This Year", ...getKpiData(startOfYear) },
   ];
 
   // Revenue trend last 14 days
@@ -85,18 +109,45 @@ function AnalyticsPage() {
 
   // Type split
   const split = useMemo(() => {
-    const snooker = paid.filter((s) => s.tableType === "snooker").reduce((a, b) => a + b.total, 0);
-    const pool = paid.filter((s) => s.tableType === "pool").reduce((a, b) => a + b.total, 0);
+    let snooker = 0;
+    let mini = 0;
+    let pool = 0;
+    let cafe = 0;
+
+    for (const s of paid) {
+      const c = s.extrasTotal || 0;
+      const t = s.total - c;
+      cafe += c;
+      if (s.tableType === "snooker") snooker += t;
+      else if (s.tableType === "mini_snooker") mini += t;
+      else if (s.tableType === "pool") pool += t;
+    }
+
     return [
       { name: "Royal Snooker", value: Math.round(snooker) },
-      { name: "Mini Pool", value: Math.round(pool) },
-    ];
+      { name: "Mini Snooker", value: Math.round(mini) },
+      { name: "Pool", value: Math.round(pool) },
+      { name: "Cafe", value: Math.round(cafe) },
+    ].filter(x => x.value > 0);
   }, [paid]);
 
-  const COLORS = ["var(--chart-1)", "var(--chart-3)"];
+  const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"];
 
   return (
     <div className="space-y-8">
+      {/* Date Filter */}
+      <div className="flex flex-wrap items-center gap-4 bg-muted/20 p-3 rounded-lg border border-border/60">
+        <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Date Filter</div>
+        <div className="flex items-center gap-2">
+          <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-8 w-auto text-sm" />
+          <span className="text-muted-foreground">to</span>
+          <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-8 w-auto text-sm" />
+          {(startDate || endDate) && (
+            <button className="text-xs text-muted-foreground hover:text-foreground ml-2" onClick={() => { setStartDate(""); setEndDate(""); }}>Clear</button>
+          )}
+        </div>
+      </div>
+
       {/* Hero strip */}
       <div className="relative overflow-hidden rounded-2xl border border-border/60">
         <img src={legends} alt="Stylized silhouettes of cue-sport champions under green spotlights" className="h-40 w-full object-cover opacity-70" loading="lazy" width={1600} height={600} />
@@ -115,7 +166,11 @@ function AnalyticsPage() {
         {kpis.map((k) => (
           <Card key={k.label} className="glass p-5">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">{k.label}</p>
-            <p className="mt-2 font-display text-3xl text-neon tabular-nums">{formatCurrency(k.value, settings.currency)}</p>
+            <p className="mt-2 font-display text-3xl text-neon tabular-nums">{formatCurrency(k.total, settings.currency)}</p>
+            <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+              <span>Table: <span className="text-foreground">{formatCurrency(k.table, settings.currency)}</span></span>
+              <span>Cafe: <span className="text-foreground">{formatCurrency(k.cafe, settings.currency)}</span></span>
+            </div>
           </Card>
         ))}
       </div>
@@ -152,7 +207,7 @@ function AnalyticsPage() {
 
         <Card className="glass p-5">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Revenue split</p>
-          <h3 className="font-display text-xl">Snooker vs Pool</h3>
+          <h3 className="font-display text-xl">By Table Type</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -195,7 +250,11 @@ function AnalyticsPage() {
               const max = tableUsage[0]?.sessions || 1;
               const pct = (t.sessions / max) * 100;
               return (
-                <li key={t.name}>
+                <li
+                  key={t.name}
+                  className="cursor-pointer hover:bg-muted/30 p-2 -mx-2 rounded-md transition-colors"
+                  onClick={() => setHistoryTable(t.name)}
+                >
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span className="font-medium">#{idx + 1} {t.name}</span>
                     <span className="tabular-nums text-muted-foreground">{t.sessions} sessions</span>
@@ -215,6 +274,12 @@ function AnalyticsPage() {
           </ul>
         </Card>
       </div>
+      
+      <TableHistoryDialog 
+        tableName={historyTable} 
+        open={!!historyTable} 
+        onOpenChange={(o) => !o && setHistoryTable(null)} 
+      />
     </div>
   );
 }

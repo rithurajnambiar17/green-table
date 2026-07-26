@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
+import { CustomerHistoryDialog } from "@/components/CustomerHistoryDialog";
 
 export const Route = createFileRoute("/_app/customers")({
   head: () => ({ meta: [{ title: "Customers — Green Table" }] }),
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/_app/customers")({
 function CustomersPage() {
   const { customers, sessions, settings } = useApp();
   const [q, setQ] = useState("");
+  const [historyCustomer, setHistoryCustomer] = useState<{ id: string, name: string } | null>(null);
 
   // derived stats from sessions
   const enriched = useMemo(() => {
@@ -58,7 +60,11 @@ function CustomersPage() {
             : tier === "Regular" ? "bg-primary text-primary-foreground"
             : "bg-muted text-muted-foreground";
           return (
-            <Card key={c.id} className="glass p-5 hover:border-primary/40">
+            <Card 
+              key={c.id} 
+              className="glass p-5 hover:border-primary/40 cursor-pointer transition-colors hover:bg-muted/10"
+              onClick={() => setHistoryCustomer({ id: c.id, name: c.name })}
+            >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="grid h-11 w-11 place-items-center rounded-full bg-accent font-display text-lg">
@@ -97,6 +103,13 @@ function CustomersPage() {
           </Card>
         )}
       </div>
+
+      <CustomerHistoryDialog 
+        customerId={historyCustomer?.id || null} 
+        customerName={historyCustomer?.name || null} 
+        open={!!historyCustomer} 
+        onOpenChange={(o) => !o && setHistoryCustomer(null)} 
+      />
     </div>
   );
 }

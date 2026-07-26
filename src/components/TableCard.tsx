@@ -8,7 +8,14 @@ import { TABLE_TYPE_LABEL, type ClubTable, type Session } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { calcBill, formatCurrency, formatDuration, sumExtras, thankYouMessage, waLink } from "@/lib/format";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { calcBill, formatCurrency, formatDuration, sumExtras } from "@/lib/format";
 import { toast } from "sonner";
 import { ExtrasManager } from "./ExtrasManager";
 import { useMounted } from "@/hooks/use-mounted";
@@ -21,7 +28,7 @@ interface Props {
 }
 
 export function TableCard({ table, session, onStart, onEdit }: Props) {
-  const { pauseSession, resumeSession, endSession, markPaid, settings } = useApp();
+  const { pauseSession, resumeSession, endSession, markPaid, dismissSession, settings } = useApp();
   const mounted = useMounted();
   const [showExtras, setShowExtras] = useState(false);
 
@@ -123,25 +130,23 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
             </div>
 
             {(status === "running" || status === "paused") && (
-              <div className="rounded-xl border border-border/60 bg-muted/20">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between px-3 py-2 text-sm"
-                  onClick={() => setShowExtras((v) => !v)}
-                >
-                  <span className="flex items-center gap-2 font-medium">
-                    <Coffee className="h-4 w-4 text-neon" />
-                    Extras (tea, cigarette, snacks…)
-                    {session.extras.length > 0 && <Badge variant="outline">{session.extras.length}</Badge>}
-                  </span>
-                  {showExtras ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </button>
-                {showExtras && (
-                  <div className="border-t border-border/60 p-3">
-                    <ExtrasManager session={session} />
-                  </div>
-                )}
-              </div>
+              <Dialog open={showExtras} onOpenChange={setShowExtras}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between px-3 h-9">
+                    <span className="flex items-center gap-2 text-sm font-medium">
+                      <Coffee className="h-4 w-4 text-neon" />
+                      Extras / Items
+                    </span>
+                    {session.extras.length > 0 && <Badge variant="secondary" className="h-5">{session.extras.length}</Badge>}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Add Items to {table.name}</DialogTitle>
+                  </DialogHeader>
+                  <ExtrasManager session={session} />
+                </DialogContent>
+              </Dialog>
             )}
 
             <div className="flex flex-wrap gap-2">
@@ -171,19 +176,28 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
                 <Pencil className="mr-1.5 h-4 w-4" /> Edit
               </Button>
               {status === "ended" && session.payment === "unpaid" && (
-                <Button
-                  size="sm"
-                  className="bg-success text-success-foreground hover:bg-success/90"
-                  onClick={async () => {
-                    await markPaid(session.id);
-                    const msg = thankYouMessage(settings.clubName, session.customerName, session.total, settings.currency);
-                    const url = waLink(session.customerPhone, settings.countryCode, msg);
-                    window.open(url, "_blank", "noopener,noreferrer");
-                    toast.success("Marked paid. WhatsApp thank-you opened.");
-                  }}
-                >
-                  <CheckCircle2 className="mr-1.5 h-4 w-4" /> Mark Paid & Send
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      dismissSession(session.id);
+                      toast.success("Session dismissed. You can pay it later from the Sessions tab.");
+                    }}
+                  >
+                    Pay Later
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-success text-success-foreground hover:bg-success/90"
+                    onClick={async () => {
+                      await markPaid(session.id);
+                      toast.success("Marked paid.");
+                    }}
+                  >
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Mark Paid
+                  </Button>
+                </>
               )}
               {session.payment === "paid" && (
                 <Badge className="bg-success text-success-foreground">

@@ -38,11 +38,4 @@ export function calcBill(opts: {
   return { base, tableCharge, extras, tax, total };
 }
 
-export function waLink(phone: string, countryCode: string, message: string) {
-  const digits = (countryCode + phone).replace(/\D/g, "");
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-}
 
-export function thankYouMessage(clubName: string, name: string, total: number, currency: string) {
-  return `🎱 Thank you for visiting ${clubName}, ${name}!\n\nYour session bill of ${formatCurrency(total, currency)} is settled. We hope you enjoyed the game on our premium tables.\n\nCome back soon for another round — the green felt awaits. 🟢✨`;
-}
