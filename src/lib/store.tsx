@@ -49,6 +49,7 @@ interface AppContextValue extends AppState {
   markUdhari: (id: string) => Promise<void>;
   toggleUdhariAccess: (customerId: string, allow: boolean) => Promise<void>;
   addUdhariTransaction: (customerId: string, amount: number, type: 'given' | 'received', notes: string) => Promise<void>;
+  deleteUdhariTransaction: (txId: string) => Promise<void>;
   dismissSession: (id: string) => void;
   addExtra: (sessionId: string, name: string, price: number, qty: number, inventoryId?: string) => Promise<void>;
   removeExtra: (extraId: string) => Promise<void>;
@@ -415,6 +416,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [user, customers]);
 
+  const deleteUdhariTransaction: AppContextValue["deleteUdhariTransaction"] = useCallback(async (txId) => {
+    const tx = customerTransactions.find(t => t.id === txId);
+    if (!tx) return;
+    
+    // revert customer balance
+    const customer = customers.find(c => c.id === tx.customerId);
+    if (customer) {
+      const newBalance = tx.type === 'given' ? customer.balance - tx.amount : customer.balance + tx.amount;
+      await supabase.from("customers").update({ balance: newBalance }).eq("id", customer.id);
+      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, balance: newBalance } : c));
+    }
+
+    await supabase.from("customer_transactions").delete().eq("id", txId);
+    setCustomerTransactions(prev => prev.filter(t => t.id !== txId));
+
+    // Revert associated session to unpaid if applicable
+    const matchedSession = sessions.find(s => 
+      s.customerId === tx.customerId && 
+      Math.abs(new Date(s.endedAt || s.startedAt).getTime() - new Date(tx.createdAt).getTime()) < 60000 &&
+      Math.abs(s.total - tx.amount) < 0.01 &&
+      s.payment === "udhari"
+    );
+    if (matchedSession) {
+      await supabase.from("sessions").update({ payment: "unpaid" }).eq("id", matchedSession.id);
+      setSessions(prev => prev.map(s => s.id === matchedSession.id ? { ...s, payment: "unpaid" } : s));
+    }
+  }, [customerTransactions, customers, sessions]);
+
   const toggleUdhariAccess: AppContextValue["toggleUdhariAccess"] = useCallback(async (id, allow) => {
     await supabase.from("customers").update({ allow_credit: allow }).eq("id", id);
     setCustomers(prev => prev.map(c => c.id === id ? { ...c, allowCredit: allow } : c));
@@ -433,6 +462,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const removeExtra: AppContextValue["removeExtra"] = useCallback(async (extraId) => {
     const s = sessions.find((x) => x.extras.some((e) => e.id === extraId));
     if (s) {
+      const extra = s.extras.find((e) => e.id === extraId)!;
+      
+      const inv = inventory.find(i => i.name === extra.name);
+      if (inv && inv.trackStock) {
+        await supabase.from("inventory_items").update({ stock: inv.stock + extra.qty }).eq("id", inv.id);
+        setInventory(prev => prev.map(i => i.id === inv.id ? { ...i, stock: i.stock + extra.qty } : i));
+      }
+
       await supabase.from("session_extras").delete().eq("id", extraId);
       const newExtras = s.extras.filter((e) => e.id !== extraId);
       const newExtrasTotal = sumExtras(newExtras);
@@ -448,7 +485,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await supabase.from("sessions").update({ extras_total: newExtrasTotal, total: newTotal }).eq("id", s.id);
       setSessions(prev => prev.map(x => x.id === s.id ? { ...x, extras: newExtras, extrasTotal: newExtrasTotal, total: newTotal } : x));
     }
-  }, [sessions]);
+  }, [sessions, inventory]);
 
   const updateExtraQty: AppContextValue["updateExtraQty"] = useCallback(async (extraId, delta) => {
     const s = sessions.find((x) => x.extras.some((e) => e.id === extraId));
@@ -545,9 +582,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const deleteSession: AppContextValue["deleteSession"] = useCallback(async (id) => {
+    const s = sessions.find((x) => x.id === id);
+    if (s && s.extras) {
+      for (const extra of s.extras) {
+        const inv = inventory.find(i => i.name === extra.name);
+        if (inv && inv.trackStock) {
+          await supabase.from("inventory_items").update({ stock: inv.stock + extra.qty }).eq("id", inv.id);
+          setInventory(prev => prev.map(i => i.id === inv.id ? { ...i, stock: i.stock + extra.qty } : i));
+        }
+      }
+    }
     await supabase.from("sessions").delete().eq("id", id);
-    setSessions(prev => prev.filter(s => s.id !== id));
-  }, []);
+    setSessions(prev => prev.filter(x => x.id !== id));
+  }, [sessions, inventory]);
 
   const createInventoryItem: AppContextValue["createInventoryItem"] = useCallback(async (item) => {
     const maxOrder = inventory.reduce((a, i) => Math.max(a, i.sortOrder), 0);
@@ -743,16 +790,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AppContextValue>(
-    () => ({
-      user, authLoading, loading, tables, customers, sessions, settings, inventory, expenses, customerTransactions, dismissedSessions,
-      signIn, signUp, logout, updateSettings,
-      startSession, pauseSession, resumeSession, endSession, updateSession, markPaid, markUdhari, toggleUdhariAccess, addUdhariTransaction, dismissSession,
-      addExtra, removeExtra, updateExtraQty, addExpense, deleteExpense, createTable, updateTable, deleteTable,
-      createInventoryItem, updateInventoryItem, deleteInventoryItem, clearData, clearSessions, deleteSession, checkoutWalkIn, logPastSession,
-    }),
+    () => {
+      const dynamicCustomers = customers.map(c => ({
+        ...c,
+        balance: sessions.filter(s => s.customerId === c.id && s.payment === "udhari").reduce((acc, s) => acc + s.total, 0)
+      }));
+
+      return {
+        user, authLoading, loading, tables, customers: dynamicCustomers, sessions, settings, inventory, expenses, customerTransactions, dismissedSessions,
+        signIn, signUp, logout, updateSettings,
+        startSession, pauseSession, resumeSession, endSession, updateSession, markPaid, markUdhari, toggleUdhariAccess, addUdhariTransaction, deleteUdhariTransaction, dismissSession,
+        addExtra, removeExtra, updateExtraQty, addExpense, deleteExpense, createTable, updateTable, deleteTable,
+        createInventoryItem, updateInventoryItem, deleteInventoryItem, clearData, clearSessions, deleteSession, checkoutWalkIn, logPastSession,
+      };
+    },
     [user, authLoading, loading, tables, customers, sessions, settings, inventory, expenses, customerTransactions, dismissedSessions,
      signIn, signUp, logout, updateSettings,
-     startSession, pauseSession, resumeSession, endSession, updateSession, markPaid, markUdhari, toggleUdhariAccess, addUdhariTransaction, dismissSession,
+     startSession, pauseSession, resumeSession, endSession, updateSession, markPaid, markUdhari, toggleUdhariAccess, addUdhariTransaction, deleteUdhariTransaction, dismissSession,
      addExtra, removeExtra, updateExtraQty, addExpense, deleteExpense, createTable, updateTable, deleteTable,
      createInventoryItem, updateInventoryItem, deleteInventoryItem, clearData, clearSessions, deleteSession, checkoutWalkIn, logPastSession],
   );

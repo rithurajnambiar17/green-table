@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import type { Session } from "@/lib/types";
 import { formatCurrency, formatDuration } from "@/lib/format";
-import { MessageCircle, Download, Trash2, CheckCircle2 } from "lucide-react";
+import { MessageCircle, Download, Trash2, CheckCircle2, BookText } from "lucide-react";
 import { toast } from "sonner";
 import { ExtrasManager } from "@/components/ExtrasManager";
 import { MarkPaidDialog } from "@/components/MarkPaidDialog";
@@ -25,7 +25,7 @@ export const Route = createFileRoute("/_app/sessions")({
 });
 
 function SessionsPage() {
-  const { sessions, settings, markPaid } = useApp();
+  const { sessions, settings, markPaid, markUdhari, customers } = useApp();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "paid" | "unpaid" | "live">("all");
   const [startDate, setStartDate] = useState("");
@@ -298,12 +298,33 @@ function SessionsPage() {
 
               <div className="pt-4 border-t border-border/60 flex flex-wrap justify-end gap-3">
                 {viewSession.payment === "unpaid" && viewSession.status === "ended" && (
-                  <Button
-                    className="gap-2 bg-success text-success-foreground hover:bg-success/90"
-                    onClick={() => setShowMarkPaidDialog(true)}
-                  >
-                    <CheckCircle2 className="h-4 w-4" /> Mark Paid
-                  </Button>
+                  <>
+                    {(() => {
+                      const c = customers.find((x) => x.id === viewSession.customerId);
+                      if (c?.allowCredit) {
+                        return (
+                          <Button
+                            className="gap-2 border-warning/50 text-warning hover:bg-warning/10"
+                            variant="outline"
+                            onClick={async () => {
+                              await markUdhari(viewSession.id);
+                              toast.success("Added to Udhari ledger.");
+                              setViewSession(null);
+                            }}
+                          >
+                            <BookText className="h-4 w-4" /> Put on Credit
+                          </Button>
+                        );
+                      }
+                      return null;
+                    })()}
+                    <Button
+                      className="gap-2 bg-success text-success-foreground hover:bg-success/90"
+                      onClick={() => setShowMarkPaidDialog(true)}
+                    >
+                      <CheckCircle2 className="h-4 w-4" /> Mark Paid
+                    </Button>
+                  </>
                 )}
                 {isAdmin && (
                   <Button variant="destructive" onClick={() => handleDeleteSession(viewSession.id)} className="gap-2">
