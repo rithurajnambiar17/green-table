@@ -1,0 +1,133 @@
+import { useState } from "react";
+import { Plus, Minus, Trash2, Package } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { useApp } from "@/lib/store";
+import { formatCurrency } from "@/lib/format";
+import type { Session } from "@/lib/types";
+import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+export function ExtrasManager({ session, compact = false }: { session: Session; compact?: boolean }) {
+  const { addExtra, removeExtra, updateExtraQty, settings, inventory } = useApp();
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState<string>("");
+  const [qty, setQty] = useState(1);
+
+  const submit = async () => {
+    const p = Number(price);
+    if (!name.trim() || !p || p <= 0 || qty <= 0) return;
+    try {
+      await addExtra(session.id, name.trim(), p, qty);
+      setName(""); setPrice(""); setQty(1);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add"); }
+  };
+
+  const quickAdd = async (itemId: string, name: string, price: number) => {
+    try {
+      await addExtra(session.id, name, price, 1, itemId);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add"); }
+  };
+
+  return (
+    <div className="space-y-3">
+      {!compact && (
+        <div className="space-y-2">
+          {inventory.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No inventory items yet. Ask an admin to add products in Inventory.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(
+                inventory.reduce((acc, item) => {
+                  if (!acc[item.category]) acc[item.category] = [];
+                  acc[item.category].push(item);
+                  return acc;
+                }, {} as Record<string, typeof inventory>)
+              ).map(([category, items]) => (
+                <DropdownMenu key={category}>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-8 capitalize">
+                      <Package className="mr-1.5 h-3.5 w-3.5" />
+                      {category}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {items.map((item) => {
+                      const out = item.trackStock && item.stock <= 0;
+                      return (
+                        <DropdownMenuItem
+                          key={item.id}
+                          disabled={out}
+                          onClick={() => quickAdd(item.id, item.name, item.price)}
+                          className="flex items-center justify-between gap-4 cursor-pointer"
+                        >
+                          <span>{item.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">{formatCurrency(item.price, settings.currency)}</span>
+                            {item.trackStock && (
+                              <Badge variant="outline" className={out ? "bg-destructive text-destructive-foreground h-4 px-1 text-[10px]" : "h-4 px-1 text-[10px]"}>
+                                {out ? "out" : item.stock}
+                              </Badge>
+                            )}
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-[1fr_90px_70px_auto] gap-2">
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Custom item" className="h-8" />
+        <Input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} placeholder="Price" className="h-8" inputMode="decimal" />
+        <Input value={qty} onChange={(e) => setQty(Math.max(1, +e.target.value || 1))} type="number" min={1} className="h-8" />
+        <Button size="sm" onClick={submit} className="h-8"><Plus className="h-3.5 w-3.5" /></Button>
+      </div>
+
+      {session.extras.length > 0 && (
+        <ul className="space-y-1.5">
+          {session.extras.map((e) => (
+            <li key={e.id} className="flex items-center justify-between rounded-md border border-border/60 bg-muted/30 px-2.5 py-1.5 text-sm">
+              <span className="flex-1 truncate pr-2">
+                {e.name}
+              </span>
+              
+              <div className="flex items-center gap-1.5 mr-3">
+                <Button variant="outline" size="icon" className="h-5 w-5 rounded-full" onClick={() => updateExtraQty(e.id, -1)}>
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <span className="text-xs font-medium w-4 text-center tabular-nums">{e.qty}</span>
+                <Button variant="outline" size="icon" className="h-5 w-5 rounded-full" onClick={() => updateExtraQty(e.id, 1)}>
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+
+              <span className="tabular-nums mr-2">{formatCurrency(e.price * e.qty, settings.currency)}</span>
+              <button
+                className="text-muted-foreground hover:text-destructive"
+                onClick={() => removeExtra(e.id)}
+                aria-label="Remove"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          ))}
+          <li className="flex items-center justify-between px-2.5 pt-1 text-sm font-medium">
+            <span>Extras subtotal</span>
+            <span className="tabular-nums text-neon">{formatCurrency(session.extras.reduce((a, e) => a + e.price * e.qty, 0), settings.currency)}</span>
+          </li>
+        </ul>
+      )}
+    </div>
+  );
+}
