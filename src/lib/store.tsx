@@ -574,7 +574,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setInventory(prev => prev.filter(i => i.id !== id));
   }, []);
 
-  const checkoutWalkIn: AppContextValue["checkoutWalkIn"] = useCallback(async (cart, customerName, customerPhone, isPaid = true, notes = "") => {
+  const checkoutWalkIn: AppContextValue["checkoutWalkIn"] = useCallback(async (cart, customerName, customerPhone, payment = "paid", notes = "") => {
     let posTable = tables.find(t => t.name === "Walk-in POS");
     if (!posTable) {
       const maxOrder = tables.reduce((a, t) => Math.max(a, t.sortOrder ?? 0), 0);

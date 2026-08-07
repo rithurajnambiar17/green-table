@@ -43,6 +43,8 @@ export type Database = {
       }
       customers: {
         Row: {
+          allow_credit: boolean
+          balance: number
           created_at: string
           id: string
           last_visit: string | null
@@ -51,6 +53,8 @@ export type Database = {
           visits: number
         }
         Insert: {
+          allow_credit?: boolean
+          balance?: number
           created_at?: string
           id?: string
           last_visit?: string | null
@@ -59,12 +63,79 @@ export type Database = {
           visits?: number
         }
         Update: {
+          allow_credit?: boolean
+          balance?: number
           created_at?: string
           id?: string
           last_visit?: string | null
           name?: string
           phone?: string
           visits?: number
+        }
+        Relationships: []
+      }
+      customer_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          id: string
+          notes: string | null
+          type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          id?: string
+          notes?: string | null
+          type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          id?: string
+          notes?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          id?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
         }
         Relationships: []
       }
@@ -124,6 +195,7 @@ export type Database = {
       }
       session_extras: {
         Row: {
+          category: string
           created_at: string
           id: string
           name: string
@@ -132,6 +204,7 @@ export type Database = {
           session_id: string
         }
         Insert: {
+          category?: string
           created_at?: string
           id?: string
           name: string
@@ -140,6 +213,7 @@ export type Database = {
           session_id: string
         }
         Update: {
+          category?: string
           created_at?: string
           id?: string
           name?: string
@@ -171,6 +245,7 @@ export type Database = {
           hourly_rate: number
           id: string
           manual_adjustment: number
+          notes: string | null
           payment: string
           run_started_at: string | null
           started_at: string
@@ -194,6 +269,7 @@ export type Database = {
           hourly_rate: number
           id?: string
           manual_adjustment?: number
+          notes?: string | null
           payment?: string
           run_started_at?: string | null
           started_at?: string
@@ -217,6 +293,7 @@ export type Database = {
           hourly_rate?: number
           id?: string
           manual_adjustment?: number
+          notes?: string | null
           payment?: string
           run_started_at?: string | null
           started_at?: string
