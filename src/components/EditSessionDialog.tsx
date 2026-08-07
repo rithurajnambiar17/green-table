@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { calcBill, formatCurrency, sumExtras } from "@/lib/format";
 import { ExtrasManager } from "./ExtrasManager";
@@ -21,11 +22,17 @@ export function EditSessionDialog({ session, open, onOpenChange }: Props) {
   const [discount, setDiscount] = useState(0);
   const [adj, setAdj] = useState(0);
   const [rate, setRate] = useState(0);
+  const [notes, setNotes] = useState("");
 
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    if (session) { setDiscount(session.discount); setAdj(session.manualAdjustment); setRate(session.hourlyRate); }
+    if (session) { 
+      setDiscount(session.discount); 
+      setAdj(session.manualAdjustment); 
+      setRate(session.hourlyRate);
+      setNotes(session.notes || "");
+    }
   }, [session]);
 
   useEffect(() => {
@@ -66,6 +73,16 @@ export function EditSessionDialog({ session, open, onOpenChange }: Props) {
           </div>
         </div>
 
+        <div className="space-y-1.5">
+          <Label>Notes</Label>
+          <Textarea 
+            placeholder="Add a note (e.g. change owed)..." 
+            value={notes} 
+            onChange={(e) => setNotes(e.target.value)} 
+            className="resize-none h-20"
+          />
+        </div>
+
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Extras</p>
           <ExtrasManager session={session} compact />
@@ -83,7 +100,7 @@ export function EditSessionDialog({ session, open, onOpenChange }: Props) {
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={async () => {
-            await updateSession(session.id, { hourlyRate: rate, discount, manualAdjustment: adj });
+            await updateSession(session.id, { hourlyRate: rate, discount, manualAdjustment: adj, notes: notes.trim() });
             onOpenChange(false);
           }}>Save</Button>
         </DialogFooter>

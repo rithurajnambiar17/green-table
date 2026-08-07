@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Package } from "lucide-react";
+import { Plus, Minus, Trash2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function ExtrasManager({ session, compact = false }: { session: Session; compact?: boolean }) {
-  const { addExtra, removeExtra, settings, inventory } = useApp();
+  const { addExtra, removeExtra, updateExtraQty, settings, inventory } = useApp();
   const [name, setName] = useState("");
   const [price, setPrice] = useState<string>("");
   const [qty, setQty] = useState(1);
@@ -98,12 +98,23 @@ export function ExtrasManager({ session, compact = false }: { session: Session; 
         <ul className="space-y-1.5">
           {session.extras.map((e) => (
             <li key={e.id} className="flex items-center justify-between rounded-md border border-border/60 bg-muted/30 px-2.5 py-1.5 text-sm">
-              <span className="flex-1 truncate">
-                {e.name} <span className="text-muted-foreground">× {e.qty}</span>
+              <span className="flex-1 truncate pr-2">
+                {e.name}
               </span>
-              <span className="tabular-nums">{formatCurrency(e.price * e.qty, settings.currency)}</span>
+              
+              <div className="flex items-center gap-1.5 mr-3">
+                <Button variant="outline" size="icon" className="h-5 w-5 rounded-full" onClick={() => updateExtraQty(e.id, -1)}>
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <span className="text-xs font-medium w-4 text-center tabular-nums">{e.qty}</span>
+                <Button variant="outline" size="icon" className="h-5 w-5 rounded-full" onClick={() => updateExtraQty(e.id, 1)}>
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+
+              <span className="tabular-nums mr-2">{formatCurrency(e.price * e.qty, settings.currency)}</span>
               <button
-                className="ml-2 text-muted-foreground hover:text-destructive"
+                className="text-muted-foreground hover:text-destructive"
                 onClick={() => removeExtra(e.id)}
                 aria-label="Remove"
               >

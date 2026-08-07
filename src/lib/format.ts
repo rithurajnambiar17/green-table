@@ -38,4 +38,7 @@ export function calcBill(opts: {
   return { base, tableCharge, extras, tax, total };
 }
 
-
+export function formatDateTime(isoString: string) {
+  const d = new Date(isoString);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}

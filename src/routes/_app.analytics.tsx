@@ -57,9 +57,16 @@ function AnalyticsPage() {
   const getKpiData = (since: Date) => {
     const subset = paid.filter((s) => new Date(s.endedAt!) >= since);
     const total = subset.reduce((a, b) => a + b.total, 0);
-    const cafe = subset.reduce((a, b) => a + (b.extrasTotal || 0), 0);
-    const table = total - cafe;
-    return { total, cafe, table };
+    let cafe = 0;
+    let tobacco = 0;
+    for (const s of subset) {
+      for (const e of s.extras) {
+        if (e.category === "tobacco") tobacco += (e.price * e.qty);
+        else cafe += (e.price * e.qty);
+      }
+    }
+    const table = total - cafe - tobacco;
+    return { total, cafe, tobacco, table };
   };
 
   const kpis = [
@@ -113,11 +120,19 @@ function AnalyticsPage() {
     let mini = 0;
     let pool = 0;
     let cafe = 0;
+    let tobacco = 0;
 
     for (const s of paid) {
-      const c = s.extrasTotal || 0;
-      const t = s.total - c;
-      cafe += c;
+      let sCafe = 0;
+      let sTobacco = 0;
+      for (const e of s.extras) {
+        if (e.category === "tobacco") sTobacco += e.price * e.qty;
+        else sCafe += e.price * e.qty;
+      }
+      const t = s.total - sCafe - sTobacco;
+      cafe += sCafe;
+      tobacco += sTobacco;
+      
       if (s.tableType === "snooker") snooker += t;
       else if (s.tableType === "mini_snooker") mini += t;
       else if (s.tableType === "pool") pool += t;
@@ -128,10 +143,11 @@ function AnalyticsPage() {
       { name: "Mini Snooker", value: Math.round(mini) },
       { name: "Pool", value: Math.round(pool) },
       { name: "Cafe", value: Math.round(cafe) },
+      { name: "Cigarettes/Tobacco", value: Math.round(tobacco) },
     ].filter(x => x.value > 0);
   }, [paid]);
 
-  const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"];
+  const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
   return (
     <div className="space-y-8">
@@ -167,9 +183,10 @@ function AnalyticsPage() {
           <Card key={k.label} className="glass p-5">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">{k.label}</p>
             <p className="mt-2 font-display text-3xl text-neon tabular-nums">{formatCurrency(k.total, settings.currency)}</p>
-            <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+            <div className="mt-3 flex justify-between text-[10px] text-muted-foreground flex-wrap gap-x-3 gap-y-1">
               <span>Table: <span className="text-foreground">{formatCurrency(k.table, settings.currency)}</span></span>
               <span>Cafe: <span className="text-foreground">{formatCurrency(k.cafe, settings.currency)}</span></span>
+              <span>Cigarettes: <span className="text-foreground">{formatCurrency(k.tobacco, settings.currency)}</span></span>
             </div>
           </Card>
         ))}

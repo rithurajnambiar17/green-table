@@ -1,6 +1,6 @@
 export type TableType = "snooker" | "mini_snooker" | "pool";
 export type SessionStatus = "running" | "paused" | "ended";
-export type PaymentStatus = "unpaid" | "paid";
+export type PaymentStatus = "unpaid" | "paid" | "udhari";
 export type Role = "admin" | "staff";
 
 export interface ClubTable {
@@ -17,6 +17,8 @@ export interface Customer {
   phone: string;
   visits: number;
   lastVisit: string | null;
+  allowCredit: boolean;
+  balance: number;
 }
 
 export interface SessionExtra {
@@ -25,6 +27,7 @@ export interface SessionExtra {
   name: string;
   price: number;
   qty: number;
+  category: string;
   createdAt: string;
 }
 
@@ -48,6 +51,7 @@ export interface Session {
   extrasTotal: number;
   total: number;
   payment: PaymentStatus;
+  notes?: string;
   extras: SessionExtra[];
 }
 
@@ -76,6 +80,25 @@ export interface User {
   name: string;
   email: string;
   role: Role;
+}
+
+export interface Expense {
+  id: string;
+  amount: number;
+  category: 'cafe' | 'table';
+  description: string;
+  createdAt: string;
+  createdBy?: string;
+}
+
+export interface CustomerTransaction {
+  id: string;
+  customerId: string;
+  amount: number;
+  type: 'given' | 'received';
+  notes: string;
+  createdAt: string;
+  createdBy?: string;
 }
 
 export const TABLE_TYPE_LABEL: Record<TableType, string> = {

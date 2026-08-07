@@ -13,10 +13,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { calcBill, formatCurrency, formatDuration, sumExtras } from "@/lib/format";
 import { toast } from "sonner";
+import { MarkPaidDialog } from "@/components/MarkPaidDialog";
 import { ExtrasManager } from "./ExtrasManager";
 import { useMounted } from "@/hooks/use-mounted";
 
@@ -31,6 +33,7 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
   const { pauseSession, resumeSession, endSession, markPaid, dismissSession, settings } = useApp();
   const mounted = useMounted();
   const [showExtras, setShowExtras] = useState(false);
+  const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
 
   const [tick, setTick] = useState(0);
 
@@ -129,7 +132,7 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
               </div>
             </div>
 
-            {(status === "running" || status === "paused") && (
+            {(status === "running" || status === "paused" || (status === "ended" && session?.payment === "unpaid")) && (
               <Dialog open={showExtras} onOpenChange={setShowExtras}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="w-full justify-between px-3 h-9">
@@ -137,12 +140,13 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
                       <Coffee className="h-4 w-4 text-neon" />
                       Extras / Items
                     </span>
-                    {session.extras.length > 0 && <Badge variant="secondary" className="h-5">{session.extras.length}</Badge>}
+                    {session.extras.length > 0 && <Badge variant="secondary" className="h-5">{session.extras.reduce((a, e) => a + e.qty, 0)}</Badge>}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-md">
                   <DialogHeader>
                     <DialogTitle>Add Items to {table.name}</DialogTitle>
+                    <DialogDescription className="sr-only">Manage extras and cafe items for this table.</DialogDescription>
                   </DialogHeader>
                   <ExtrasManager session={session} />
                 </DialogContent>
@@ -190,10 +194,7 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
                   <Button
                     size="sm"
                     className="bg-success text-success-foreground hover:bg-success/90"
-                    onClick={async () => {
-                      await markPaid(session.id);
-                      toast.success("Marked paid.");
-                    }}
+                    onClick={() => setShowMarkPaidDialog(true)}
                   >
                     <CheckCircle2 className="mr-1.5 h-4 w-4" /> Mark Paid
                   </Button>
@@ -225,6 +226,21 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
         <div className="border-t border-border/60 bg-warning/10 px-5 py-2 text-xs text-warning-foreground/90 flex items-center gap-2">
           <MessageCircle className="h-3.5 w-3.5" /> Payment pending — total {formatCurrency(session.total, settings.currency)}
         </div>
+      )}
+
+      {session?.notes && (
+        <div className="border-t border-border/60 bg-muted/40 px-5 py-3">
+          <p className="text-xs uppercase text-muted-foreground mb-1">Notes</p>
+          <p className="text-sm text-foreground/90 whitespace-pre-wrap">{session.notes}</p>
+        </div>
+      )}
+
+      {session && (
+        <MarkPaidDialog
+          session={session}
+          open={showMarkPaidDialog}
+          onOpenChange={setShowMarkPaidDialog}
+        />
       )}
     </Card>
   );

@@ -12,11 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppUdhariRouteImport } from './routes/_app.udhari'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppSessionsRouteImport } from './routes/_app.sessions'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
+import { Route as AppExpensesRouteImport } from './routes/_app.expenses'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
+import { Route as AppCafeRouteImport } from './routes/_app.cafe'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -33,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppUdhariRoute = AppUdhariRouteImport.update({
+  id: '/udhari',
+  path: '/udhari',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -48,6 +56,11 @@ const AppInventoryRoute = AppInventoryRouteImport.update({
   path: '/inventory',
   getParentRoute: () => AppRoute,
 } as any)
+const AppExpensesRoute = AppExpensesRouteImport.update({
+  id: '/expenses',
+  path: '/expenses',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -56,6 +69,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
 const AppCustomersRoute = AppCustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCafeRoute = AppCafeRouteImport.update({
+  id: '/cafe',
+  path: '/cafe',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
@@ -68,21 +86,27 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/analytics': typeof AppAnalyticsRoute
+  '/cafe': typeof AppCafeRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
+  '/expenses': typeof AppExpensesRoute
   '/inventory': typeof AppInventoryRoute
   '/sessions': typeof AppSessionsRoute
   '/settings': typeof AppSettingsRoute
+  '/udhari': typeof AppUdhariRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/analytics': typeof AppAnalyticsRoute
+  '/cafe': typeof AppCafeRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
+  '/expenses': typeof AppExpensesRoute
   '/inventory': typeof AppInventoryRoute
   '/sessions': typeof AppSessionsRoute
   '/settings': typeof AppSettingsRoute
+  '/udhari': typeof AppUdhariRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -90,11 +114,14 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_app/analytics': typeof AppAnalyticsRoute
+  '/_app/cafe': typeof AppCafeRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/expenses': typeof AppExpensesRoute
   '/_app/inventory': typeof AppInventoryRoute
   '/_app/sessions': typeof AppSessionsRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/udhari': typeof AppUdhariRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -102,32 +129,41 @@ export interface FileRouteTypes {
     | '/'
     | '/sitemap.xml'
     | '/analytics'
+    | '/cafe'
     | '/customers'
     | '/dashboard'
+    | '/expenses'
     | '/inventory'
     | '/sessions'
     | '/settings'
+    | '/udhari'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/sitemap.xml'
     | '/analytics'
+    | '/cafe'
     | '/customers'
     | '/dashboard'
+    | '/expenses'
     | '/inventory'
     | '/sessions'
     | '/settings'
+    | '/udhari'
   id:
     | '__root__'
     | '/'
     | '/_app'
     | '/sitemap.xml'
     | '/_app/analytics'
+    | '/_app/cafe'
     | '/_app/customers'
     | '/_app/dashboard'
+    | '/_app/expenses'
     | '/_app/inventory'
     | '/_app/sessions'
     | '/_app/settings'
+    | '/_app/udhari'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -159,6 +195,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/udhari': {
+      id: '/_app/udhari'
+      path: '/udhari'
+      fullPath: '/udhari'
+      preLoaderRoute: typeof AppUdhariRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -180,6 +223,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInventoryRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/expenses': {
+      id: '/_app/expenses'
+      path: '/expenses'
+      fullPath: '/expenses'
+      preLoaderRoute: typeof AppExpensesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -194,6 +244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCustomersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/cafe': {
+      id: '/_app/cafe'
+      path: '/cafe'
+      fullPath: '/cafe'
+      preLoaderRoute: typeof AppCafeRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/analytics': {
       id: '/_app/analytics'
       path: '/analytics'
@@ -206,20 +263,26 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAnalyticsRoute: typeof AppAnalyticsRoute
+  AppCafeRoute: typeof AppCafeRoute
   AppCustomersRoute: typeof AppCustomersRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppExpensesRoute: typeof AppExpensesRoute
   AppInventoryRoute: typeof AppInventoryRoute
   AppSessionsRoute: typeof AppSessionsRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppUdhariRoute: typeof AppUdhariRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAnalyticsRoute: AppAnalyticsRoute,
+  AppCafeRoute: AppCafeRoute,
   AppCustomersRoute: AppCustomersRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppExpensesRoute: AppExpensesRoute,
   AppInventoryRoute: AppInventoryRoute,
   AppSessionsRoute: AppSessionsRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppUdhariRoute: AppUdhariRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

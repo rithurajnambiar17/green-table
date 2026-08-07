@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { TABLE_TYPE_LABEL, type ClubTable } from "@/lib/types";
 import { toast } from "sonner";
+import { CustomerAutocomplete } from "./CustomerAutocomplete";
 
 interface Props {
   table: ClubTable | null;
@@ -48,10 +49,15 @@ export function StartSessionDialog({ table, open, onOpenChange }: Props) {
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label htmlFor="pname">Player name</Label>
-            <Input id="pname" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ali Raza" list="known-customers" autoFocus />
-            <datalist id="known-customers">
-              {customers.map((c) => <option key={c.id} value={c.name} />)}
-            </datalist>
+            <CustomerAutocomplete 
+              id="pname"
+              placeholder="e.g. Ali Raza" 
+              value={name} 
+              onChange={(n, p) => {
+                setName(n);
+                if (p) setPhone(p);
+              }} 
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="pphone">Phone number</Label>

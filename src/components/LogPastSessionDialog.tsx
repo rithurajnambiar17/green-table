@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Minus, Trash2, Package, Clock } from "lucide-react";
+import { Plus, Minus, Trash2, Package, Clock, StickyNote, BookText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -21,14 +21,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CustomerAutocomplete } from "./CustomerAutocomplete";
 
 export function LogPastSessionDialog() {
-  const { inventory, tables, settings, logPastSession } = useApp();
+  const { inventory, tables, settings, logPastSession, customers } = useApp();
   const [open, setOpen] = useState(false);
   const [cart, setCart] = useState<{ name: string; price: number; qty: number; inventoryId?: string }[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [tableId, setTableId] = useState("");
+  const [notes, setNotes] = useState("");
   
   // Format dates for datetime-local input
   const toLocalISO = (d: Date) => {
@@ -37,7 +39,6 @@ export function LogPastSessionDialog() {
 
   const [startedAt, setStartedAt] = useState(toLocalISO(new Date(Date.now() - 3600000)));
   const [endedAt, setEndedAt] = useState(toLocalISO(new Date()));
-  const [isPaid, setIsPaid] = useState(false);
   
   const [customName, setCustomName] = useState("");
   const [customPrice, setCustomPrice] = useState("");
@@ -82,7 +83,9 @@ export function LogPastSessionDialog() {
     }));
   };
 
-  const submit = async () => {
+  const selectedCustomerObj = customers.find(c => c.name === customerName && (!customerPhone || c.phone === customerPhone));
+
+  const submit = async (payment: import("@/lib/types").PaymentStatus = "paid") => {
     if (!tableId) {
       toast.error("Please select a table");
       return;
@@ -102,7 +105,8 @@ export function LogPastSessionDialog() {
         customerPhone,
         startedAt: start.toISOString(),
         endedAt: end.toISOString(),
-        isPaid,
+        payment,
+        notes,
         cart
       });
       toast.success("Past session logged successfully!");
@@ -111,7 +115,7 @@ export function LogPastSessionDialog() {
       setCustomerName("");
       setCustomerPhone("");
       setTableId("");
-      setIsPaid(false);
+      setNotes("");
       setStartedAt(toLocalISO(new Date(Date.now() - 3600000)));
       setEndedAt(toLocalISO(new Date()));
     } catch (e: any) {
@@ -176,8 +180,32 @@ export function LogPastSessionDialog() {
               <p className="text-xs font-medium text-muted-foreground uppercase">Customer Details (Optional)</p>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Input placeholder="Name" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+              <CustomerAutocomplete 
+                placeholder="Name" 
+                value={customerName} 
+                onChange={(name, phone) => {
+                  setCustomerName(name);
+                  if (phone) setCustomerPhone(phone);
+                }} 
+              />
               <Input placeholder="Phone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value.replace(/[^\d]/g, ""))} />
+            </div>
+
+            {selectedCustomerObj?.allowCredit && (
+              <div className="text-xs font-medium flex justify-between items-center bg-muted/20 p-2.5 rounded-md border border-border/40">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <BookText className="h-3.5 w-3.5" /> Udhari Balance:
+                </span>
+                <span className={selectedCustomerObj.balance > 0 ? "text-destructive" : selectedCustomerObj.balance < 0 ? "text-success" : ""}>
+                  {selectedCustomerObj.balance > 0 ? "Owes " : selectedCustomerObj.balance < 0 ? "Advance " : ""}
+                  {formatCurrency(Math.abs(selectedCustomerObj.balance), settings.currency)}
+                </span>
+              </div>
+            )}
+
+            <div className="relative">
+              <StickyNote className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Notes (optional)..." value={notes} onChange={e => setNotes(e.target.value)} className="pl-9" />
             </div>
           </div>
 
@@ -261,17 +289,7 @@ export function LogPastSessionDialog() {
             </div>
           )}
 
-          <div className="pt-2 border-t border-border/60 flex items-center justify-between">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isPaid}
-                onChange={(e) => setIsPaid(e.target.checked)}
-                className="h-4 w-4 rounded border-border bg-background"
-              />
-              Mark as Paid
-            </label>
-          </div>
+
 
           <div className="flex justify-between items-end pt-2 border-t border-border/60">
             <div className="text-sm">
@@ -286,9 +304,20 @@ export function LogPastSessionDialog() {
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={!tableId} className="glow-neon">Log Session</Button>
+          <div className="flex-1" />
+          <Button variant="secondary" onClick={() => submit("unpaid")} disabled={!tableId}>
+            Log Unpaid
+          </Button>
+          {selectedCustomerObj?.allowCredit && (
+            <Button variant="outline" className="border-warning/50 text-warning hover:bg-warning/10" onClick={() => submit("udhari")} disabled={!tableId}>
+              Log on Udhari
+            </Button>
+          )}
+          <Button onClick={() => submit("paid")} disabled={!tableId} className="glow-neon">
+            Log Paid
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -10,11 +10,14 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import type { Session } from "@/lib/types";
 import { formatCurrency, formatDuration } from "@/lib/format";
 import { MessageCircle, Download, Trash2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { ExtrasManager } from "@/components/ExtrasManager";
+import { MarkPaidDialog } from "@/components/MarkPaidDialog";
 
 export const Route = createFileRoute("/_app/sessions")({
   head: () => ({ meta: [{ title: "Sessions — Green Table" }] }),
@@ -28,6 +31,7 @@ function SessionsPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [viewSession, setViewSession] = useState<Session | null>(null);
+  const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
 
   const filtered = useMemo(() => {
     return sessions
@@ -245,6 +249,7 @@ function SessionsPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Session Details</DialogTitle>
+            <DialogDescription className="sr-only">Details for the selected session.</DialogDescription>
           </DialogHeader>
           {viewSession && (
             <div className="space-y-4 text-sm">
@@ -255,7 +260,9 @@ function SessionsPage() {
               
               <div>
                 <p className="text-xs uppercase text-muted-foreground mb-2">Items Purchased</p>
-                {viewSession.extras.length > 0 ? (
+                {viewSession.payment === "unpaid" && viewSession.status === "ended" ? (
+                  <ExtrasManager session={viewSession} compact={false} />
+                ) : viewSession.extras.length > 0 ? (
                   <ul className="space-y-1">
                     {viewSession.extras.map(e => (
                       <li key={e.id} className="flex justify-between">
@@ -282,15 +289,18 @@ function SessionsPage() {
                 </div>
               </div>
 
+              {viewSession.notes && (
+                <div className="pt-3 border-t border-border/60">
+                  <p className="text-xs uppercase text-muted-foreground mb-1">Notes</p>
+                  <p className="text-sm whitespace-pre-wrap">{viewSession.notes}</p>
+                </div>
+              )}
+
               <div className="pt-4 border-t border-border/60 flex flex-wrap justify-end gap-3">
                 {viewSession.payment === "unpaid" && viewSession.status === "ended" && (
                   <Button
                     className="gap-2 bg-success text-success-foreground hover:bg-success/90"
-                    onClick={async () => {
-                      await markPaid(viewSession.id);
-                      toast.success("Session marked as paid.");
-                      setViewSession({ ...viewSession, payment: "paid" });
-                    }}
+                    onClick={() => setShowMarkPaidDialog(true)}
                   >
                     <CheckCircle2 className="h-4 w-4" /> Mark Paid
                   </Button>
@@ -305,6 +315,17 @@ function SessionsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <MarkPaidDialog
+        session={viewSession}
+        open={showMarkPaidDialog}
+        onOpenChange={setShowMarkPaidDialog}
+        onSuccess={(note) => {
+          if (viewSession) {
+            setViewSession({ ...viewSession, payment: "paid", notes: note });
+          }
+        }}
+      />
     </div>
   );
 }

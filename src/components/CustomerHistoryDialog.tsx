@@ -3,6 +3,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { formatCurrency, formatDuration } from "@/lib/format";
 import type { Session } from "@/lib/types";
@@ -31,6 +32,7 @@ export function CustomerHistoryDialog({ customerId, customerName, open, onOpenCh
       <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Session History: {customerName}</DialogTitle>
+          <DialogDescription className="sr-only">History of sessions for this customer.</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-auto rounded-md border border-border/60">

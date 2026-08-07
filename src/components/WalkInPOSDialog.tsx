@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Minus, Trash2, Package, ShoppingCart } from "lucide-react";
+import { Plus, Minus, Trash2, Package, ShoppingCart, StickyNote, BookText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -21,13 +21,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CustomerAutocomplete } from "./CustomerAutocomplete";
 
 export function WalkInPOSDialog() {
-  const { inventory, settings, checkoutWalkIn } = useApp();
+  const { inventory, settings, checkoutWalkIn, customers } = useApp();
   const [open, setOpen] = useState(false);
   const [cart, setCart] = useState<{ name: string; price: number; qty: number; inventoryId?: string }[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [notes, setNotes] = useState("");
   
   const [customName, setCustomName] = useState("");
   const [customPrice, setCustomPrice] = useState("");
@@ -72,18 +74,21 @@ export function WalkInPOSDialog() {
     }));
   };
 
-  const checkout = async (isPaid = true) => {
+  const selectedCustomerObj = customers.find(c => c.name === customerName && (!customerPhone || c.phone === customerPhone));
+
+  const checkout = async (payment: import("@/lib/types").PaymentStatus = "paid") => {
     if (cart.length === 0) {
       toast.error("Cart is empty");
       return;
     }
     try {
-      await checkoutWalkIn(cart, customerName, customerPhone, isPaid);
-      toast.success(isPaid ? "Walk-in checkout complete (Paid)" : "Walk-in checkout saved as Unpaid");
+      await checkoutWalkIn(cart, customerName, customerPhone, payment, notes);
+      toast.success(payment === "paid" ? "Walk-in checkout complete (Paid)" : payment === "udhari" ? "Added to Udhari" : "Walk-in checkout saved as Unpaid");
       setOpen(false);
       setCart([]);
       setCustomerName("");
       setCustomerPhone("");
+      setNotes("");
     } catch (e: any) {
       toast.error(e.message || "Failed to checkout");
     }
@@ -109,8 +114,32 @@ export function WalkInPOSDialog() {
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="Customer name (optional)" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-            <Input placeholder="Phone (optional)" value={customerPhone} onChange={e => setCustomerPhone(e.target.value.replace(/[^\d]/g, ""))} />
+            <CustomerAutocomplete 
+              placeholder="Customer name (optional)" 
+              value={customerName} 
+              onChange={(name, phone) => {
+                setCustomerName(name);
+                if (phone) setCustomerPhone(phone);
+              }} 
+            />
+            <Input placeholder="Optional phone..." value={customerPhone} onChange={e => setCustomerPhone(e.target.value.replace(/[^\d]/g, ""))} type="tel" />
+          </div>
+
+          {selectedCustomerObj?.allowCredit && (
+            <div className="text-xs font-medium flex justify-between items-center bg-muted/20 p-2.5 rounded-md border border-border/40">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <BookText className="h-3.5 w-3.5" /> Udhari Balance:
+              </span>
+              <span className={selectedCustomerObj.balance > 0 ? "text-destructive" : selectedCustomerObj.balance < 0 ? "text-success" : ""}>
+                {selectedCustomerObj.balance > 0 ? "Owes " : selectedCustomerObj.balance < 0 ? "Advance " : ""}
+                {formatCurrency(Math.abs(selectedCustomerObj.balance), settings.currency)}
+              </span>
+            </div>
+          )}
+
+          <div className="relative">
+            <StickyNote className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Notes (optional)..." value={notes} onChange={e => setNotes(e.target.value)} className="pl-9" />
           </div>
 
           <div className="space-y-2">
@@ -207,14 +236,19 @@ export function WalkInPOSDialog() {
           </div>
         </div>
 
-        <DialogFooter className="flex items-center gap-2">
+        <DialogFooter className="flex flex-wrap items-center gap-2 mt-2">
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           <div className="flex-1" />
-          <Button variant="secondary" onClick={() => checkout(false)} disabled={cart.length === 0}>
-            Checkout (Unpaid)
+          <Button variant="secondary" onClick={() => checkout("unpaid")} disabled={cart.length === 0}>
+            (Unpaid)
           </Button>
-          <Button onClick={() => checkout(true)} disabled={cart.length === 0} className="glow-neon">
-            Checkout (Paid)
+          {selectedCustomerObj?.allowCredit && (
+            <Button variant="outline" className="border-warning/50 text-warning hover:bg-warning/10" onClick={() => checkout("udhari")} disabled={cart.length === 0}>
+              Put on Udhari
+            </Button>
+          )}
+          <Button onClick={() => checkout("paid")} disabled={cart.length === 0} className="glow-neon">
+            Checkout
           </Button>
         </DialogFooter>
       </DialogContent>
