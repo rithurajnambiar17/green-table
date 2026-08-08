@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import {
   Play, Pause, Square, CheckCircle2, Pencil, CircleDollarSign,
-  MessageCircle, Coffee, ChevronDown, ChevronUp,
+  MessageCircle, Coffee, ChevronDown, ChevronUp, BookText
 } from "lucide-react";
 import { sessionElapsedMs, useApp, rateForType } from "@/lib/store";
 import { TABLE_TYPE_LABEL, type ClubTable, type Session } from "@/lib/types";
@@ -30,7 +30,7 @@ interface Props {
 }
 
 export function TableCard({ table, session, onStart, onEdit }: Props) {
-  const { pauseSession, resumeSession, endSession, markPaid, dismissSession, settings } = useApp();
+  const { pauseSession, resumeSession, endSession, markPaid, markUdhari, dismissSession, settings, customers } = useApp();
   const mounted = useMounted();
   const [showExtras, setShowExtras] = useState(false);
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
@@ -61,6 +61,10 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
   }, [session, elapsed, extrasTotal]);
 
   const status = session?.status ?? "idle";
+
+  const customer = useMemo(() => {
+    return session?.customerId ? customers.find(c => c.id === session.customerId) : null;
+  }, [session?.customerId, customers]);
 
   const statusBadge: Record<string, { label: string; className: string }> = {
     idle: { label: "Available", className: "bg-muted text-muted-foreground" },
@@ -191,6 +195,20 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
                   >
                     Pay Later
                   </Button>
+                  {customer?.allowCredit && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-warning/50 text-warning hover:bg-warning/10"
+                      onClick={async () => {
+                        await markUdhari(session.id);
+                        dismissSession(session.id);
+                        toast.success("Added to Udhari ledger.");
+                      }}
+                    >
+                      <BookText className="mr-1.5 h-4 w-4" /> Put on Credit
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     className="bg-success text-success-foreground hover:bg-success/90"

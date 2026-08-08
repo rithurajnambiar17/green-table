@@ -75,7 +75,7 @@ export function MarkPaidDialog({ session, open, onOpenChange, onSuccess }: Props
             You can optionally leave or update a note below before marking this session as paid.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="py-4 space-y-4">
           {customer?.allowCredit && (
             <div className="text-xs font-medium flex justify-between items-center bg-muted/20 p-2.5 rounded-md border border-border/40">
@@ -88,7 +88,7 @@ export function MarkPaidDialog({ session, open, onOpenChange, onSuccess }: Props
               </span>
             </div>
           )}
-          <Textarea 
+          <Textarea
             placeholder="e.g. Owe customer 500 change..."
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -101,11 +101,11 @@ export function MarkPaidDialog({ session, open, onOpenChange, onSuccess }: Props
             Cancel
           </Button>
           <div className="flex-1" />
-          {customer?.allowCredit && (
+          {/* {customer?.allowCredit && (
             <Button variant="outline" onClick={handleUdhari} disabled={isSubmitting} className="border-warning/50 text-warning hover:bg-warning/10">
               Put on Udhari
             </Button>
-          )}
+          )} */}
           <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-success text-success-foreground hover:bg-success/90">
             <CheckCircle2 className="mr-1.5 h-4 w-4" /> Confirm Payment
           </Button>

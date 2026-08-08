@@ -2,12 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useApp } from "@/lib/store";
 import { Card } from "@/components/ui/card";
-import { formatCurrency, formatDateTime } from "@/lib/format";
-import { BookText, UserPlus, ArrowUpRight, ArrowDownLeft, Search, Plus } from "lucide-react";
+import { formatCurrency, formatDateTime, formatDuration } from "@/lib/format";
+import { BookText, UserPlus, ArrowUpRight, ArrowDownLeft, Search, Plus, Info, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Customer } from "@/lib/types";
+import { Customer, Session } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { MarkPaidDialog } from "@/components/MarkPaidDialog";
 import { CustomerAutocomplete } from "@/components/CustomerAutocomplete";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -18,20 +19,17 @@ export const Route = createFileRoute("/_app/udhari")({
 });
 
 function UdhariPage() {
-  const { customers, customerTransactions, settings, toggleUdhariAccess, addUdhariTransaction } = useApp();
+  const { customers, sessions, settings, toggleUdhariAccess } = useApp();
   
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
+  const [viewSession, setViewSession] = useState<Session | null>(null);
+  const [sessionToPay, setSessionToPay] = useState<Session | null>(null);
   
   // Add Customer form state
   const [addCustName, setAddCustName] = useState("");
   const [addCustPhone, setAddCustPhone] = useState("");
-
-  // Transaction form state
-  const [txType, setTxType] = useState<'given'|'received'|null>(null);
-  const [txAmount, setTxAmount] = useState("");
-  const [txNotes, setTxNotes] = useState("");
 
   const udhariCustomers = customers.filter(c => c.allowCredit);
   const filteredCustomers = udhariCustomers.filter(c => 
@@ -39,8 +37,12 @@ function UdhariPage() {
     c.phone.includes(searchTerm)
   );
 
-  const selectedTx = selectedCustomer 
-    ? customerTransactions.filter(tx => tx.customerId === selectedCustomer.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const getCustomerBalance = (customerId: string) => {
+    return sessions.filter(s => s.customerId === customerId && s.payment === "udhari").reduce((acc, s) => acc + s.total, 0);
+  };
+
+  const selectedCustomerSessions = selectedCustomer 
+    ? sessions.filter(s => s.customerId === selectedCustomer.id && s.payment === "udhari").sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
     : [];
 
   const handleAddUdhariCustomer = async () => {
@@ -55,23 +57,7 @@ function UdhariPage() {
     setAddCustPhone("");
   };
 
-  const handleTransaction = async () => {
-    if (!selectedCustomer || !txType) return;
-    const amount = Number(txAmount);
-    if (isNaN(amount) || amount <= 0) return;
-
-    await addUdhariTransaction(selectedCustomer.id, amount, txType, txNotes);
-    
-    setTxType(null);
-    setTxAmount("");
-    setTxNotes("");
-    
-    // Refresh selected customer state to show new balance
-    const updated = customers.find(c => c.id === selectedCustomer.id);
-    if (updated) setSelectedCustomer(updated);
-  };
-
-  const totalOutstanding = udhariCustomers.reduce((sum, c) => sum + c.balance, 0);
+  const totalOutstanding = udhariCustomers.reduce((sum, c) => sum + getCustomerBalance(c.id), 0);
 
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col gap-6 md:flex-row">
@@ -126,28 +112,31 @@ function UdhariPage() {
               No Udhari customers found.
             </div>
           ) : (
-            filteredCustomers.map(customer => (
-              <button
-                key={customer.id}
-                onClick={() => setSelectedCustomer(customer)}
-                className={`w-full text-left p-3 rounded-lg border transition-all ${
-                  selectedCustomer?.id === customer.id 
-                    ? "bg-accent border-neon/50 shadow-[0_0_10px_rgba(var(--neon-rgb),0.1)]" 
-                    : "bg-card border-border/40 hover:bg-muted/50"
-                }`}
-              >
-                <div className="flex justify-between items-start mb-1">
-                  <span className="font-semibold">{customer.name}</span>
-                  <span className={`font-semibold ${customer.balance > 0 ? 'text-destructive' : 'text-success'}`}>
-                    {formatCurrency(Math.abs(customer.balance), settings.currency)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{customer.phone || "No phone"}</span>
-                  <span>{customer.balance > 0 ? "You'll get" : customer.balance < 0 ? "You'll give" : "Settled"}</span>
-                </div>
-              </button>
-            ))
+            filteredCustomers.map(customer => {
+              const liveBalance = getCustomerBalance(customer.id);
+              return (
+                <button
+                  key={customer.id}
+                  onClick={() => setSelectedCustomer(customer)}
+                  className={`w-full text-left p-3 rounded-lg border transition-all ${
+                    selectedCustomer?.id === customer.id 
+                      ? "bg-accent border-neon/50 shadow-[0_0_10px_rgba(var(--neon-rgb),0.1)]" 
+                      : "bg-card border-border/40 hover:bg-muted/50"
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="font-semibold">{customer.name}</span>
+                    <span className={`font-semibold ${liveBalance > 0 ? 'text-destructive' : 'text-success'}`}>
+                      {formatCurrency(Math.abs(liveBalance), settings.currency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{customer.phone || "No phone"}</span>
+                    <span>{liveBalance > 0 ? "Amount Due" : "Settled"}</span>
+                  </div>
+                </button>
+              );
+            })
           )}
         </div>
       </div>
@@ -163,95 +152,53 @@ function UdhariPage() {
               </div>
               <div className="text-right">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Net Balance</p>
-                <p className={`font-display text-2xl ${selectedCustomer.balance > 0 ? 'text-destructive' : selectedCustomer.balance < 0 ? 'text-success' : 'text-foreground'}`}>
-                  {formatCurrency(Math.abs(selectedCustomer.balance), settings.currency)}
+                <p className={`font-display text-2xl ${getCustomerBalance(selectedCustomer.id) > 0 ? 'text-destructive' : 'text-foreground'}`}>
+                  {formatCurrency(Math.abs(getCustomerBalance(selectedCustomer.id)), settings.currency)}
                 </p>
-                <p className="text-xs text-muted-foreground">{selectedCustomer.balance > 0 ? "You will get" : selectedCustomer.balance < 0 ? "You will give" : "Account Settled"}</p>
+                <p className="text-xs text-muted-foreground">{getCustomerBalance(selectedCustomer.id) > 0 ? "Amount Due" : "Account Settled"}</p>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
-              {selectedTx.length === 0 ? (
+              {selectedCustomerSessions.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                   <BookText className="h-12 w-12 opacity-20 mb-4" />
-                  <p>No transactions yet.</p>
+                  <p>No pending Udhari sessions.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {selectedTx.map((tx) => (
-                    <div key={tx.id} className="flex flex-col p-3 rounded-lg bg-background border border-border/40">
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="text-sm text-muted-foreground">{formatDateTime(tx.createdAt)}</span>
-                        <span className={`font-semibold ${tx.type === 'given' ? 'text-destructive' : 'text-success'}`}>
-                          {tx.type === 'given' ? '-' : '+'}{formatCurrency(tx.amount, settings.currency)}
+                  {selectedCustomerSessions.map((session) => (
+                    <div 
+                      key={session.id} 
+                      className="flex flex-col p-4 rounded-lg bg-background border border-border/40 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => setViewSession(session)}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          {session.tableName}
+                          <Info className="h-3 w-3 text-neon" />
+                        </span>
+                        <span className="font-semibold text-destructive">
+                          {formatCurrency(session.total, settings.currency)}
                         </span>
                       </div>
                       <div className="flex justify-between items-end">
-                        <span className="text-sm">{tx.notes || (tx.type === 'given' ? 'Credit given' : 'Payment received')}</span>
-                        <Badge variant="outline" className={`text-[10px] ${tx.type === 'given' ? 'border-destructive/30 text-destructive' : 'border-success/30 text-success'}`}>
-                          {tx.type === 'given' ? 'You Gave' : 'You Got'}
-                        </Badge>
+                        <span className="text-xs text-muted-foreground">{formatDateTime(session.startedAt)}</span>
+                        <Button
+                          size="sm"
+                          className="bg-success text-success-foreground hover:bg-success/90 h-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSessionToPay(session);
+                          }}
+                        >
+                          Mark Paid
+                        </Button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
-
-            <div className="p-4 border-t border-border/60 bg-muted/10">
-              <div className="grid grid-cols-2 gap-4">
-                <Dialog open={txType === 'given'} onOpenChange={(open) => !open && setTxType(null)}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full border-destructive/50 text-destructive hover:bg-destructive/10" onClick={() => setTxType('given')}>
-                      <ArrowUpRight className="mr-2 h-4 w-4" /> You Gave (₹)
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle className="text-destructive">You Gave to {selectedCustomer.name}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <Label>Amount</Label>
-                        <Input type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)} placeholder="0" className="text-lg" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Notes (Optional)</Label>
-                        <Input value={txNotes} onChange={e => setTxNotes(e.target.value)} placeholder="e.g., Borrowed for food" />
-                      </div>
-                      <Button className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={handleTransaction} disabled={!txAmount}>
-                        Save
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                <Dialog open={txType === 'received'} onOpenChange={(open) => !open && setTxType(null)}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full border-success/50 text-success hover:bg-success/10" onClick={() => setTxType('received')}>
-                      <ArrowDownLeft className="mr-2 h-4 w-4" /> You Got (₹)
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle className="text-success">You Got from {selectedCustomer.name}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <Label>Amount</Label>
-                        <Input type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)} placeholder="0" className="text-lg" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Notes (Optional)</Label>
-                        <Input value={txNotes} onChange={e => setTxNotes(e.target.value)} placeholder="e.g., Paid via Cash" />
-                      </div>
-                      <Button className="w-full bg-success text-success-foreground hover:bg-success/90" onClick={handleTransaction} disabled={!txAmount}>
-                        Save
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
             </div>
           </>
         ) : (
@@ -262,6 +209,61 @@ function UdhariPage() {
           </div>
         )}
       </div>
+
+      {/* Session Details Dialog */}
+      <Dialog open={!!viewSession} onOpenChange={(open) => !open && setViewSession(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Session Details</DialogTitle>
+            <DialogDescription className="sr-only">Details for the selected session.</DialogDescription>
+          </DialogHeader>
+          {viewSession && (
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-2 border-b border-border/60 pb-3">
+                <div><span className="text-muted-foreground block text-xs uppercase">Player</span> <span className="font-medium">{viewSession.customerName}</span></div>
+                <div><span className="text-muted-foreground block text-xs uppercase">Table</span> <span className="font-medium">{viewSession.tableName}</span></div>
+              </div>
+              
+              <div>
+                <p className="text-xs uppercase text-muted-foreground mb-2">Items Purchased</p>
+                {viewSession.extras.length > 0 ? (
+                  <ul className="space-y-1">
+                    {viewSession.extras.map(e => (
+                      <li key={e.id} className="flex justify-between">
+                        <span>{e.name} <span className="text-muted-foreground ml-1">× {e.qty}</span></span>
+                        <span>{formatCurrency(e.price * e.qty, settings.currency)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted-foreground italic">No items taken.</p>
+                )}
+              </div>
+
+              <div className="pt-3 border-t border-border/60 flex flex-col gap-1">
+                {viewSession.hourlyRate > 0 && viewSession.accumulatedMs > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Table Time ({formatDuration(viewSession.accumulatedMs)})</span>
+                    <span>{formatCurrency(viewSession.total - viewSession.extrasTotal - viewSession.taxRate, settings.currency)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-display text-lg pt-1">
+                  <span>Total</span>
+                  <span className="text-neon">{formatCurrency(viewSession.total, settings.currency)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      <MarkPaidDialog
+        session={sessionToPay}
+        open={!!sessionToPay}
+        onOpenChange={(open) => !open && setSessionToPay(null)}
+        onSuccess={(note) => {
+          setSessionToPay(null);
+        }}
+      />
     </div>
   );
 }
