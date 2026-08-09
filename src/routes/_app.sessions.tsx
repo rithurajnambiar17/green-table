@@ -31,6 +31,7 @@ function SessionsPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [viewSession, setViewSession] = useState<Session | null>(null);
+  const activeSession = viewSession ? sessions.find(s => s.id === viewSession.id) || viewSession : null;
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
 
   const filtered = useMemo(() => {
@@ -71,19 +72,26 @@ function SessionsPage() {
       toast.error("No sessions to export");
       return;
     }
-    const headers = ["Player", "Phone", "Table", "Type", "Started At", "Ended At", "Duration (mins)", "Status", "Payment", "Total"];
-    const rows = filtered.map(s => [
-      s.customerName,
-      s.customerPhone,
-      s.tableName,
-      s.tableType,
-      new Date(s.startedAt).toLocaleString(),
-      s.endedAt ? new Date(s.endedAt).toLocaleString() : "",
-      Math.floor(s.accumulatedMs / 60000),
-      s.status,
-      s.payment,
-      s.total
-    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+    const headers = ["Player", "Phone", "Table", "Type", "Started At", "Ended At", "Duration (mins)", "Status", "Payment", "Extras Cost", "Total", "Items"];
+    const rows = filtered.map(s => {
+      const itemsStr = s.extras && s.extras.length > 0 
+        ? s.extras.map(e => `${e.name} (x${e.qty})`).join(" | ")
+        : "-";
+      return [
+        s.customerName,
+        s.customerPhone,
+        s.tableName,
+        s.tableType,
+        new Date(s.startedAt).toLocaleString(),
+        s.endedAt ? new Date(s.endedAt).toLocaleString() : "",
+        Math.floor(s.accumulatedMs / 60000),
+        s.status,
+        s.payment,
+        s.extrasTotal || 0,
+        s.total,
+        itemsStr
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",");
+    });
     
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -251,20 +259,20 @@ function SessionsPage() {
             <DialogTitle>Session Details</DialogTitle>
             <DialogDescription className="sr-only">Details for the selected session.</DialogDescription>
           </DialogHeader>
-          {viewSession && (
+          {activeSession && (
             <div className="space-y-4 text-sm">
               <div className="grid grid-cols-2 gap-2 border-b border-border/60 pb-3">
-                <div><span className="text-muted-foreground block text-xs uppercase">Player</span> <span className="font-medium">{viewSession.customerName}</span></div>
-                <div><span className="text-muted-foreground block text-xs uppercase">Table</span> <span className="font-medium">{viewSession.tableName}</span></div>
+                <div><span className="text-muted-foreground block text-xs uppercase">Player</span> <span className="font-medium">{activeSession.customerName}</span></div>
+                <div><span className="text-muted-foreground block text-xs uppercase">Table</span> <span className="font-medium">{activeSession.tableName}</span></div>
               </div>
               
               <div>
                 <p className="text-xs uppercase text-muted-foreground mb-2">Items Purchased</p>
-                {viewSession.payment === "unpaid" && viewSession.status === "ended" ? (
-                  <ExtrasManager session={viewSession} compact={false} />
-                ) : viewSession.extras.length > 0 ? (
+                {activeSession.payment === "unpaid" && activeSession.status === "ended" ? (
+                  <ExtrasManager session={activeSession} compact={false} />
+                ) : activeSession.extras.length > 0 ? (
                   <ul className="space-y-1">
-                    {viewSession.extras.map(e => (
+                    {activeSession.extras.map(e => (
                       <li key={e.id} className="flex justify-between">
                         <span>{e.name} <span className="text-muted-foreground ml-1">× {e.qty}</span></span>
                         <span>{formatCurrency(e.price * e.qty, settings.currency)}</span>
@@ -277,37 +285,37 @@ function SessionsPage() {
               </div>
 
               <div className="pt-3 border-t border-border/60 flex flex-col gap-1">
-                {viewSession.hourlyRate > 0 && viewSession.accumulatedMs > 0 && (
+                {activeSession.hourlyRate > 0 && activeSession.accumulatedMs > 0 && (
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Table Time ({formatDuration(viewSession.accumulatedMs)})</span>
-                    <span>{formatCurrency(viewSession.total - viewSession.extrasTotal - viewSession.taxRate, settings.currency)}</span>
+                    <span>Table Time ({formatDuration(activeSession.accumulatedMs)})</span>
+                    <span>{formatCurrency(activeSession.total - activeSession.extrasTotal - activeSession.taxRate, settings.currency)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-display text-lg pt-1">
                   <span>Total</span>
-                  <span className="text-neon">{formatCurrency(viewSession.total, settings.currency)}</span>
+                  <span className="text-neon">{formatCurrency(activeSession.total, settings.currency)}</span>
                 </div>
               </div>
 
-              {viewSession.notes && (
+              {activeSession.notes && (
                 <div className="pt-3 border-t border-border/60">
                   <p className="text-xs uppercase text-muted-foreground mb-1">Notes</p>
-                  <p className="text-sm whitespace-pre-wrap">{viewSession.notes}</p>
+                  <p className="text-sm whitespace-pre-wrap">{activeSession.notes}</p>
                 </div>
               )}
 
               <div className="pt-4 border-t border-border/60 flex flex-wrap justify-end gap-3">
-                {viewSession.payment === "unpaid" && viewSession.status === "ended" && (
+                {activeSession.payment === "unpaid" && activeSession.status === "ended" && (
                   <>
                     {(() => {
-                      const c = customers.find((x) => x.id === viewSession.customerId);
+                      const c = customers.find((x) => x.id === activeSession.customerId);
                       if (c?.allowCredit) {
                         return (
                           <Button
                             className="gap-2 border-warning/50 text-warning hover:bg-warning/10"
                             variant="outline"
                             onClick={async () => {
-                              await markUdhari(viewSession.id);
+                              await markUdhari(activeSession.id);
                               toast.success("Added to Udhari ledger.");
                               setViewSession(null);
                             }}
@@ -327,7 +335,7 @@ function SessionsPage() {
                   </>
                 )}
                 {isAdmin && (
-                  <Button variant="destructive" onClick={() => handleDeleteSession(viewSession.id)} className="gap-2">
+                  <Button variant="destructive" onClick={() => handleDeleteSession(activeSession.id)} className="gap-2">
                     <Trash2 className="h-4 w-4" /> Delete
                   </Button>
                 )}
@@ -338,12 +346,12 @@ function SessionsPage() {
       </Dialog>
 
       <MarkPaidDialog
-        session={viewSession}
+        session={activeSession}
         open={showMarkPaidDialog}
         onOpenChange={setShowMarkPaidDialog}
         onSuccess={(note) => {
-          if (viewSession) {
-            setViewSession({ ...viewSession, payment: "paid", notes: note });
+          if (activeSession) {
+            setViewSession({ ...activeSession, payment: "paid", notes: note });
           }
         }}
       />
