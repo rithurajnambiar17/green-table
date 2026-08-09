@@ -206,11 +206,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const [tablesRes, customersRes, sessionsRes, extrasRes, settingsRes, inventoryRes, expensesRes, txRes] = await Promise.all([
       supabase.from("club_tables").select("*").order("sort_order"),
       supabase.from("customers").select("*").order("last_visit", { ascending: false, nullsFirst: false }),
-      supabase.from("sessions").select("*").order("started_at", { ascending: false }).limit(500),
-      supabase.from("session_extras").select("*").order("created_at", { ascending: false }).limit(5000),
+      supabase.from("sessions").select("*").order("started_at", { ascending: false }).limit(3000),
+      supabase.from("session_extras").select("*").order("created_at", { ascending: false }).limit(10000),
       supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
       supabase.from("inventory_items").select("*").order("sort_order"),
-      supabase.from("expenses").select("*").order("created_at", { ascending: false }).limit(500),
+      supabase.from("expenses").select("*").order("created_at", { ascending: false }).limit(3000),
       supabase.from("customer_transactions").select("*").order("created_at", { ascending: false }),
     ]);
     setTables((tablesRes.data ?? []).map((r) => mapTable(r as DbTable)));
