@@ -55,6 +55,7 @@ interface AppContextValue extends AppState {
   removeExtra: (extraId: string) => Promise<void>;
   updateExtraQty: (extraId: string, delta: number) => Promise<void>;
   addExpense: (amount: number, category: 'cafe' | 'table', description: string) => Promise<void>;
+  updateExpense: (id: string, patch: { amount?: number; category?: 'cafe' | 'table'; description?: string }) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   createTable: (name: string, type: TableType) => Promise<void>;
   updateTable: (id: string, patch: Partial<ClubTable>) => Promise<void>;
@@ -100,7 +101,7 @@ type DbCustomerTransaction = { id: string; customer_id: string; amount: number; 
 
 const mapTable = (r: DbTable): ClubTable => ({ id: r.id, name: r.name, type: r.type as TableType, active: r.active, sortOrder: r.sort_order });
 const mapCustomer = (r: DbCustomer): Customer => ({ id: r.id, name: r.name, phone: r.phone, visits: r.visits, lastVisit: r.last_visit, allowCredit: r.allow_credit || false, balance: Number(r.balance || 0) });
-const mapCustomerTransaction = (r: DbCustomerTransaction): import("./types").CustomerTransaction => ({ id: r.id, customerId: r.customer_id, amount: Number(r.amount), type: r.type as 'given'|'received', notes: r.notes || "", createdAt: r.created_at, createdBy: r.created_by });
+const mapCustomerTransaction = (r: DbCustomerTransaction): import("./types").CustomerTransaction => ({ id: r.id, customerId: r.customer_id, amount: Number(r.amount), type: r.type as 'given' | 'received', notes: r.notes || "", createdAt: r.created_at, createdBy: r.created_by });
 const mapExtra = (r: DbExtra): SessionExtra => ({ id: r.id, sessionId: r.session_id, name: r.name, price: Number(r.price), qty: r.qty, category: r.category, createdAt: r.created_at });
 const mapSession = (r: DbSession, extras: SessionExtra[]): Session => ({
   id: r.id, tableId: r.table_id, tableName: r.table_name, tableType: r.table_type as TableType,
@@ -133,6 +134,25 @@ export function rateForType(t: TableType, s: Settings): number {
   return s.poolRate;
 }
 
+export async function fetchPaginated(table: string, orderBy: string, maxLimit: number) {
+  let allData: any[] = [];
+  let from = 0;
+  const step = 1000;
+  while (from < maxLimit) {
+    const to = Math.min(from + step - 1, maxLimit - 1);
+    const { data, error } = await supabase
+      .from(table as any)
+      .select("*")
+      .order(orderBy, { ascending: false })
+      .range(from, to);
+    if (error || !data) break;
+    allData = allData.concat(data);
+    if (data.length < step) break;
+    from += step;
+  }
+  return { data: allData };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -150,7 +170,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const stored = localStorage.getItem("dismissed_sessions");
       if (stored) setDismissedSessions(JSON.parse(stored));
-    } catch(e) {}
+    } catch (e) { }
   }, []);
 
   const dismissSession = useCallback((id: string) => {
@@ -206,12 +226,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const [tablesRes, customersRes, sessionsRes, extrasRes, settingsRes, inventoryRes, expensesRes, txRes] = await Promise.all([
       supabase.from("club_tables").select("*").order("sort_order"),
       supabase.from("customers").select("*").order("last_visit", { ascending: false, nullsFirst: false }),
-      supabase.from("sessions").select("*").order("started_at", { ascending: false }).limit(3000),
-      supabase.from("session_extras").select("*").order("created_at", { ascending: false }).limit(10000),
+      fetchPaginated("sessions", "started_at", 5000),
+      fetchPaginated("session_extras", "created_at", 20000),
       supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
       supabase.from("inventory_items").select("*").order("sort_order"),
-      supabase.from("expenses").select("*").order("created_at", { ascending: false }).limit(3000),
-      supabase.from("customer_transactions").select("*").order("created_at", { ascending: false }),
+      fetchPaginated("expenses", "created_at", 5000),
+      fetchPaginated("customer_transactions", "created_at", 5000),
     ]);
     setTables((tablesRes.data ?? []).map((r) => mapTable(r as DbTable)));
     setCustomers((customersRes.data ?? []).map((r) => mapCustomer(r as DbCustomer)));
@@ -403,10 +423,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { data } = await supabase.from("customer_transactions").insert({
       customer_id: customerId, amount, type, notes, created_by: user?.id
     }).select("*").maybeSingle();
-    
+
     if (data) {
       setCustomerTransactions(prev => [mapCustomerTransaction(data as DbCustomerTransaction), ...prev]);
-      
+
       const customer = customers.find(c => c.id === customerId);
       if (customer) {
         const newBalance = type === 'given' ? customer.balance + amount : customer.balance - amount;
@@ -419,7 +439,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteUdhariTransaction: AppContextValue["deleteUdhariTransaction"] = useCallback(async (txId) => {
     const tx = customerTransactions.find(t => t.id === txId);
     if (!tx) return;
-    
+
     // revert customer balance
     const customer = customers.find(c => c.id === tx.customerId);
     if (customer) {
@@ -432,8 +452,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCustomerTransactions(prev => prev.filter(t => t.id !== txId));
 
     // Revert associated session to unpaid if applicable
-    const matchedSession = sessions.find(s => 
-      s.customerId === tx.customerId && 
+    const matchedSession = sessions.find(s =>
+      s.customerId === tx.customerId &&
       Math.abs(new Date(s.endedAt || s.startedAt).getTime() - new Date(tx.createdAt).getTime()) < 60000 &&
       Math.abs(s.total - tx.amount) < 0.01 &&
       s.payment === "udhari"
@@ -463,7 +483,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const s = sessions.find((x) => x.extras.some((e) => e.id === extraId));
     if (s) {
       const extra = s.extras.find((e) => e.id === extraId)!;
-      
+
       const inv = inventory.find(i => i.name === extra.name);
       if (inv && inv.trackStock) {
         await supabase.from("inventory_items").update({ stock: inv.stock + extra.qty }).eq("id", inv.id);
@@ -481,7 +501,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           taxRate: s.taxRate, extrasTotal: newExtrasTotal,
         }).total;
       }
-      
+
       await supabase.from("sessions").update({ extras_total: newExtrasTotal, total: newTotal }).eq("id", s.id);
       setSessions(prev => prev.map(x => x.id === s.id ? { ...x, extras: newExtras, extrasTotal: newExtrasTotal, total: newTotal } : x));
     }
@@ -508,7 +528,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     await supabase.from("session_extras").update({ qty: newQty }).eq("id", extraId);
-    
+
     const newExtras = s.extras.map(e => e.id === extraId ? { ...e, qty: newQty } : e);
     const newExtrasTotal = sumExtras(newExtras);
     let newTotal = s.total;
@@ -519,7 +539,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         taxRate: s.taxRate, extrasTotal: newExtrasTotal,
       }).total;
     }
-    
+
     await supabase.from("sessions").update({ extras_total: newExtrasTotal, total: newTotal }).eq("id", s.id);
     setSessions(prev => prev.map(x => x.id === s.id ? { ...x, extras: newExtras, extrasTotal: newExtrasTotal, total: newTotal } : x));
   }, [sessions, inventory, removeExtra]);
@@ -545,7 +565,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { data: ins } = await supabase.from("session_extras")
       .insert({ session_id: sessionId, name, price, qty, category }).select("*").maybeSingle();
     if (!ins) return;
-    
+
     const newExtras = [...(s?.extras ?? []), mapExtra(ins as DbExtra)];
     const newExtrasTotal = sumExtras(newExtras);
     let newTotal = s ? s.total : 0;
@@ -562,7 +582,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         taxRate: s.taxRate, extrasTotal: newExtrasTotal,
       }).total;
     }
-    
+
     await supabase.from("sessions").update({ extras_total: newExtrasTotal, total: newTotal }).eq("id", sessionId);
     setSessions(prev => prev.map(x => x.id === sessionId ? { ...x, extras: newExtras, extrasTotal: newExtrasTotal, total: newTotal } : x));
   }, [sessions, inventory, updateExtraQty]);
@@ -682,7 +702,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const inv = inventory.find(i => i.id === item.inventoryId);
         if (inv) category = inv.category;
         if (inv?.trackStock) {
-           await supabase.from("inventory_items").update({ stock: inv.stock - item.qty }).eq("id", item.inventoryId);
+          await supabase.from("inventory_items").update({ stock: inv.stock - item.qty }).eq("id", item.inventoryId);
         }
       }
       await supabase.from("session_extras").insert({
@@ -691,7 +711,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     if (payment === "udhari" && customerId) {
-       await addUdhariTransaction(customerId, total, "given", `Walk-in POS: ${cart.map(c => c.name).join(", ")}`);
+      await addUdhariTransaction(customerId, total, "given", `Walk-in POS: ${cart.map(c => c.name).join(", ")}`);
     }
 
     await loadAll();
@@ -762,7 +782,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const inv = inventory.find(i => i.id === item.inventoryId);
         if (inv) category = inv.category;
         if (inv?.trackStock) {
-           await supabase.from("inventory_items").update({ stock: inv.stock - item.qty }).eq("id", item.inventoryId);
+          await supabase.from("inventory_items").update({ stock: inv.stock - item.qty }).eq("id", item.inventoryId);
         }
       }
       await supabase.from("session_extras").insert({
@@ -784,6 +804,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  const updateExpense: AppContextValue["updateExpense"] = useCallback(async (id, patch) => {
+    if (Object.keys(patch).length > 0) {
+      await supabase.from("expenses").update(patch).eq("id", id);
+      setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
+    }
+  }, []);
+
   const deleteExpense: AppContextValue["deleteExpense"] = useCallback(async (id) => {
     await supabase.from("expenses").delete().eq("id", id);
     setExpenses(prev => prev.filter(e => e.id !== id));
@@ -800,15 +827,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         user, authLoading, loading, tables, customers: dynamicCustomers, sessions, settings, inventory, expenses, customerTransactions, dismissedSessions,
         signIn, signUp, logout, updateSettings,
         startSession, pauseSession, resumeSession, endSession, updateSession, markPaid, markUdhari, toggleUdhariAccess, addUdhariTransaction, deleteUdhariTransaction, dismissSession,
-        addExtra, removeExtra, updateExtraQty, addExpense, deleteExpense, createTable, updateTable, deleteTable,
+        addExtra, removeExtra, updateExtraQty, addExpense, updateExpense, deleteExpense, createTable, updateTable, deleteTable,
         createInventoryItem, updateInventoryItem, deleteInventoryItem, clearData, clearSessions, deleteSession, checkoutWalkIn, logPastSession,
       };
     },
     [user, authLoading, loading, tables, customers, sessions, settings, inventory, expenses, customerTransactions, dismissedSessions,
-     signIn, signUp, logout, updateSettings,
-     startSession, pauseSession, resumeSession, endSession, updateSession, markPaid, markUdhari, toggleUdhariAccess, addUdhariTransaction, deleteUdhariTransaction, dismissSession,
-     addExtra, removeExtra, updateExtraQty, addExpense, deleteExpense, createTable, updateTable, deleteTable,
-     createInventoryItem, updateInventoryItem, deleteInventoryItem, clearData, clearSessions, deleteSession, checkoutWalkIn, logPastSession],
+      signIn, signUp, logout, updateSettings,
+      startSession, pauseSession, resumeSession, endSession, updateSession, markPaid, markUdhari, toggleUdhariAccess, addUdhariTransaction, deleteUdhariTransaction, dismissSession,
+      addExtra, removeExtra, updateExtraQty, addExpense, updateExpense, deleteExpense, createTable, updateTable, deleteTable,
+      createInventoryItem, updateInventoryItem, deleteInventoryItem, clearData, clearSessions, deleteSession, checkoutWalkIn, logPastSession],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

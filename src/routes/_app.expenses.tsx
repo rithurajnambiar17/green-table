@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { Plus, Trash2, Banknote, Calendar, Coffee } from "lucide-react";
+import { Plus, Trash2, Banknote, Calendar, Coffee, Pencil, Check, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,13 +26,21 @@ export const Route = createFileRoute("/_app/expenses")({
 });
 
 function ExpensesPage() {
-  const { expenses, addExpense, deleteExpense, settings, user } = useApp();
+  const { expenses, addExpense, updateExpense, deleteExpense, settings, user } = useApp();
   const isAdmin = user?.role === "admin";
 
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<"cafe" | "table">("cafe");
   const [description, setDescription] = useState("");
   const [filter, setFilter] = useState<"all" | "cafe" | "table">("all");
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editCategory, setEditCategory] = useState<"cafe" | "table">("cafe");
+  const [editDesc, setEditDesc] = useState("");
 
   const add = async () => {
     if (!description.trim()) { toast.error("Description required"); return; }
@@ -62,6 +70,15 @@ function ExpensesPage() {
     if (filter === "all") return expenses;
     return expenses.filter((e) => e.category === filter);
   }, [expenses, filter]);
+
+  // Reset pagination on filter change
+  useMemo(() => setCurrentPage(1), [filter]);
+
+  const totalPages = Math.ceil(displayedExpenses.length / pageSize);
+  const paginatedExpenses = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return displayedExpenses.slice(start, start + pageSize);
+  }, [displayedExpenses, currentPage]);
 
   return (
     <div className="space-y-6">
@@ -123,6 +140,22 @@ function ExpensesPage() {
         <div className="border-b border-border/60 px-6 py-4 flex items-center justify-between">
           <h2 className="font-display text-xl">Recent Expenses</h2>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between bg-muted/20 border-b border-border/60 px-6 py-2 text-xs">
+            <span className="text-muted-foreground">
+              Showing <span className="font-medium text-foreground">{(currentPage - 1) * pageSize + 1}</span>-
+              <span className="font-medium text-foreground">{Math.min(currentPage * pageSize, displayedExpenses.length)}</span> of{" "}
+              <span className="font-medium text-foreground">{displayedExpenses.length}</span> expenses
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="h-6 px-2 text-[10px]" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+              <span className="text-muted-foreground">{currentPage} / {totalPages}</span>
+              <Button variant="outline" size="sm" className="h-6 px-2 text-[10px]" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+            </div>
+          </div>
+        )}
+
         {displayedExpenses.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             <Banknote className="mx-auto mb-2 h-6 w-6 opacity-60" />
@@ -137,48 +170,105 @@ function ExpensesPage() {
                   <th className="px-6 py-3 font-medium">Category</th>
                   <th className="px-6 py-3 font-medium">Description</th>
                   <th className="px-6 py-3 font-medium text-right">Amount</th>
-                  {isAdmin && <th className="px-6 py-3 font-medium w-16"></th>}
+                  {isAdmin && <th className="px-6 py-3 font-medium w-24"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {displayedExpenses.map((expense) => (
+                {paginatedExpenses.map((expense) => {
+                  const isEditing = editingId === expense.id;
+                  
+                  return (
                   <tr key={expense.id} className="hover:bg-muted/20">
-                    <td className="px-6 py-3 whitespace-nowrap">
-                      {new Date(expense.createdAt).toLocaleDateString()} {new Date(expense.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className="px-6 py-3 capitalize text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        {expense.category === 'cafe' ? <Coffee className="h-3.5 w-3.5" /> : <Banknote className="h-3.5 w-3.5" />}
-                        {expense.category === 'table' ? 'Table/Cigarettes' : expense.category}
-                      </div>
-                    </td>
-                    <td className="px-6 py-3 font-medium">{expense.description}</td>
-                    <td className="px-6 py-3 text-right tabular-nums">{formatCurrency(expense.amount, settings.currency)}</td>
-                    {isAdmin && (
-                      <td className="px-6 py-3 text-right">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Delete">
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                    {isEditing ? (
+                      <>
+                        <td className="px-6 py-3 whitespace-nowrap text-muted-foreground">
+                          {new Date(expense.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-3">
+                          <Select value={editCategory} onValueChange={(v: "cafe" | "table") => setEditCategory(v)}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cafe">Cafe</SelectItem>
+                              <SelectItem value="table">Table/Cigarette</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="px-6 py-3">
+                          <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="h-8 text-xs" />
+                        </td>
+                        <td className="px-6 py-3">
+                          <Input value={editAmount} onChange={(e) => setEditAmount(e.target.value.replace(/[^\d.]/g, ""))} className="h-8 text-xs text-right" inputMode="decimal" />
+                        </td>
+                        <td className="px-6 py-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-success" onClick={async () => {
+                              if (!editDesc.trim()) { toast.error("Description required"); return; }
+                              const amt = Number(editAmount);
+                              if (isNaN(amt) || amt <= 0) { toast.error("Valid amount required"); return; }
+                              try {
+                                await updateExpense(expense.id, { amount: amt, category: editCategory, description: editDesc.trim() });
+                                setEditingId(null);
+                                toast.success("Expense updated");
+                              } catch (e: any) { toast.error(e.message || "Failed to update"); }
+                            }}>
+                              <Check className="h-4 w-4" />
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete expense?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete this expense of {formatCurrency(expense.amount, settings.currency)}? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={async () => { await deleteExpense(expense.id); toast.success("Deleted"); }}>Delete</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </td>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => setEditingId(null)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-6 py-3 whitespace-nowrap">
+                          {new Date(expense.createdAt).toLocaleDateString()} {new Date(expense.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="px-6 py-3 capitalize text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            {expense.category === 'cafe' ? <Coffee className="h-3.5 w-3.5" /> : <Banknote className="h-3.5 w-3.5" />}
+                            {expense.category === 'table' ? 'Table/Cigarettes' : expense.category}
+                          </div>
+                        </td>
+                        <td className="px-6 py-3 font-medium">{expense.description}</td>
+                        <td className="px-6 py-3 text-right tabular-nums">{formatCurrency(expense.amount, settings.currency)}</td>
+                        {isAdmin && (
+                          <td className="px-6 py-3 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => {
+                                setEditingId(expense.id);
+                                setEditAmount(expense.amount.toString());
+                                setEditCategory(expense.category);
+                                setEditDesc(expense.description);
+                              }}>
+                                <Pencil className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Delete">
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete expense?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete this expense of {formatCurrency(expense.amount, settings.currency)}? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={async () => { await deleteExpense(expense.id); toast.success("Deleted"); }}>Delete</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </td>
+                        )}
+                      </>
                     )}
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>

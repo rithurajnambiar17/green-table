@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_app/cafe")({
   head: () => ({ meta: [{ title: "Cafe Log — Green Table" }] }),
@@ -32,6 +33,9 @@ function CafePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const logs = useMemo(() => {
     let paid = sessions.filter((s) => s.payment === "paid" && s.endedAt);
@@ -97,6 +101,15 @@ function CafePage() {
     }).filter(log => log.items.size > 0);
   }, [logs, searchTerm]);
 
+  // Reset to first page on filter change
+  useMemo(() => setCurrentPage(1), [searchTerm, startDate, endDate]);
+
+  const totalPages = Math.ceil(filteredLogs.length / pageSize);
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredLogs.slice(start, start + pageSize);
+  }, [filteredLogs, currentPage]);
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-5">
@@ -133,6 +146,39 @@ function CafePage() {
         </div>
       </header>
 
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between bg-muted/20 rounded-md px-3 py-2 border border-border/60 text-xs">
+          <span className="text-muted-foreground">
+            Showing <span className="font-medium text-foreground">{(currentPage - 1) * pageSize + 1}</span>-
+            <span className="font-medium text-foreground">{Math.min(currentPage * pageSize, filteredLogs.length)}</span> of{" "}
+            <span className="font-medium text-foreground">{filteredLogs.length}</span> days
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </Button>
+            <span className="text-muted-foreground">
+              {currentPage} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
       {logs.length === 0 ? (
         <Card className="glass p-12 text-center">
           <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-muted/50 mb-4">
@@ -148,7 +194,7 @@ function CafePage() {
         </Card>
       ) : (
         <div className="space-y-8">
-          {filteredLogs.map((log) => {
+          {paginatedLogs.map((log) => {
             const items = Array.from(log.items.entries()).sort((a, b) => b[1].qty - a[1].qty);
             
             return (
