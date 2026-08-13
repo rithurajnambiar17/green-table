@@ -34,11 +34,14 @@ function SessionsPage() {
   const activeSession = viewSession ? sessions.find(s => s.id === viewSession.id) || viewSession : null;
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 50;
+
   const filtered = useMemo(() => {
     return sessions
       .filter((s) => {
         if (filter === "paid") return s.payment === "paid";
-        if (filter === "unpaid") return s.payment === "unpaid";
+        if (filter === "unpaid") return s.payment === "unpaid" && s.status === "ended";
         if (filter === "live") return s.status === "running" || s.status === "paused";
         return true;
       })
@@ -52,7 +55,6 @@ function SessionsPage() {
         );
       })
       .filter((s) => {
-        if (!s.endedAt) return true;
         const dateToCheck = s.endedAt || s.startedAt;
         if (startDate) {
           const start = new Date(`${startDate}T00:00:00`);
@@ -66,6 +68,15 @@ function SessionsPage() {
       })
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
   }, [sessions, q, filter, startDate, endDate]);
+
+  // Reset to first page on filter change
+  useMemo(() => setCurrentPage(1), [q, filter, startDate, endDate]);
+
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paginatedSessions = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage]);
 
   const exportCSV = () => {
     if (filtered.length === 0) {
@@ -176,8 +187,40 @@ function SessionsPage() {
             <button className="text-xs text-muted-foreground hover:text-foreground ml-2" onClick={() => { setStartDate(""); setEndDate(""); }}>Clear</button>
           )}
         </div>
-        <span className="text-xs text-muted-foreground">{filtered.length} sessions</span>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between bg-muted/20 rounded-md px-3 py-2 border border-border/60 text-xs">
+          <span className="text-muted-foreground">
+            Showing <span className="font-medium text-foreground">{(currentPage - 1) * pageSize + 1}</span>-
+            <span className="font-medium text-foreground">{Math.min(currentPage * pageSize, filtered.length)}</span> of{" "}
+            <span className="font-medium text-foreground">{filtered.length}</span> sessions
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </Button>
+            <span className="text-muted-foreground">
+              {currentPage} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Card className="glass overflow-hidden p-0">
         <div className="scrollbar-thin overflow-x-auto">
@@ -194,7 +237,7 @@ function SessionsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
-              {filtered.map((s) => (
+              {paginatedSessions.map((s) => (
                 <tr 
                   key={s.id} 
                   className="transition-colors hover:bg-muted/30 cursor-pointer"
