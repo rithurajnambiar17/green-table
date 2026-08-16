@@ -15,6 +15,13 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/_app/cafe")({
   head: () => ({ meta: [{ title: "Cafe Log — Green Table" }] }),
@@ -33,27 +40,34 @@ function CafePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState<"all" | "paid" | "unpaid">("paid");
 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
   const logs = useMemo(() => {
-    let paid = sessions.filter((s) => s.payment === "paid" && s.endedAt);
+    let baseSessions = sessions.filter((s) => s.endedAt);
+    
+    if (paymentFilter === "paid") {
+      baseSessions = baseSessions.filter(s => s.payment === "paid");
+    } else if (paymentFilter === "unpaid") {
+      baseSessions = baseSessions.filter(s => s.payment === "unpaid");
+    }
     
     if (startDate) {
       const sDate = new Date(startDate);
-      paid = paid.filter(s => new Date(s.endedAt!) >= sDate);
+      baseSessions = baseSessions.filter(s => new Date(s.endedAt!) >= sDate);
     }
     if (endDate) {
       const eDate = new Date(endDate);
       eDate.setHours(23, 59, 59, 999);
-      paid = paid.filter(s => new Date(s.endedAt!) <= eDate);
+      baseSessions = baseSessions.filter(s => new Date(s.endedAt!) <= eDate);
     }
     
     // Group by day (YYYY-MM-DD local)
     const grouped = new Map<string, DailyLog>();
 
-    for (const session of paid) {
+    for (const session of baseSessions) {
       const ended = new Date(session.endedAt!);
       const dateStr = ended.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
       const dateKey = ended.toDateString();
@@ -88,7 +102,7 @@ function CafePage() {
     return Array.from(grouped.values())
       .filter((l) => l.revenue > 0) // Only show days with actual cafe sales
       .sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [sessions, startDate, endDate]);
+  }, [sessions, startDate, endDate, paymentFilter]);
 
   const filteredLogs = useMemo(() => {
     if (!searchTerm) return logs;
@@ -102,7 +116,7 @@ function CafePage() {
   }, [logs, searchTerm]);
 
   // Reset to first page on filter change
-  useMemo(() => setCurrentPage(1), [searchTerm, startDate, endDate]);
+  useMemo(() => setCurrentPage(1), [searchTerm, startDate, endDate, paymentFilter]);
 
   const totalPages = Math.ceil(filteredLogs.length / pageSize);
   const paginatedLogs = useMemo(() => {
@@ -132,16 +146,32 @@ function CafePage() {
           </div>
         </div>
         
-        {/* Date Filter */}
-        <div className="flex flex-wrap items-center gap-4 bg-muted/20 p-3 rounded-lg border border-border/60 w-fit">
-          <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Date Filter</div>
-          <div className="flex items-center gap-2">
-            <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-8 w-auto text-sm" />
-            <span className="text-muted-foreground">to</span>
-            <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-8 w-auto text-sm" />
-            {(startDate || endDate) && (
-              <button className="text-xs text-muted-foreground hover:text-foreground ml-2" onClick={() => { setStartDate(""); setEndDate(""); }}>Clear</button>
-            )}
+        {/* Filters */}
+        <div className="flex flex-wrap items-stretch gap-4">
+          <div className="flex items-center gap-4 bg-muted/20 p-3 rounded-lg border border-border/60">
+            <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Date Filter</div>
+            <div className="flex items-center gap-2">
+              <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-8 w-auto text-sm" />
+              <span className="text-muted-foreground">to</span>
+              <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-8 w-auto text-sm" />
+              {(startDate || endDate) && (
+                <button className="text-xs text-muted-foreground hover:text-foreground ml-2" onClick={() => { setStartDate(""); setEndDate(""); }}>Clear</button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 bg-muted/20 p-3 rounded-lg border border-border/60">
+            <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Payment</div>
+            <Select value={paymentFilter} onValueChange={(val: any) => setPaymentFilter(val)}>
+              <SelectTrigger className="h-8 w-[120px] text-sm bg-background">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="unpaid">Unpaid</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </header>
