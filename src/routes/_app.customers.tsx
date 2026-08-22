@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useApp } from "@/lib/store";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
 import { CustomerHistoryDialog } from "@/components/CustomerHistoryDialog";
@@ -16,6 +17,22 @@ function CustomersPage() {
   const { customers, sessions, settings } = useApp();
   const [q, setQ] = useState("");
   const [historyCustomer, setHistoryCustomer] = useState<{ id: string, name: string } | null>(null);
+
+  const [enteredPin, setEnteredPin] = useState("");
+  const [pinMatched, setPinMatched] = useState(false);
+
+  useEffect(() => {
+    if (pinMatched) {
+      const timer = setTimeout(() => {
+        setPinMatched(false);
+        setEnteredPin("");
+      }, 5 * 60 * 1000); // 5 minutes timeout
+      return () => clearTimeout(timer);
+    }
+  }, [pinMatched]);
+
+  const HARDCODED_PIN = "280474";
+  const isAuthenticated = pinMatched;
 
   // derived stats from sessions
   const enriched = useMemo(() => {
@@ -40,11 +57,43 @@ function CustomersPage() {
     return c.name.toLowerCase().includes(t) || c.phone.includes(t);
   });
 
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-display mb-2">Protected CRM</h2>
+          <p className="text-muted-foreground text-sm">Please enter the PIN to view customers.</p>
+        </div>
+        <div className="flex gap-2 w-full max-w-xs">
+          <Input
+            type="password"
+            placeholder="Enter PIN"
+            value={enteredPin}
+            onChange={(e) => setEnteredPin(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (enteredPin === HARDCODED_PIN) setPinMatched(true);
+              }
+            }}
+          />
+          <Button onClick={() => {
+            if (enteredPin === HARDCODED_PIN) setPinMatched(true);
+          }}>Verify</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <header>
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">CRM</p>
-        <h1 className="font-display text-3xl md:text-4xl">Customers</h1>
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">CRM</p>
+          <h1 className="font-display text-3xl md:text-4xl">Customers</h1>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => { setPinMatched(false); setEnteredPin(""); }}>
+          Lock Customers
+        </Button>
       </header>
 
       <div className="flex items-center gap-3">
@@ -57,11 +106,11 @@ function CustomersPage() {
           const tier = c.visits >= 8 ? "VIP" : c.visits >= 3 ? "Regular" : "New";
           const color =
             tier === "VIP" ? "bg-gold text-primary-foreground"
-            : tier === "Regular" ? "bg-primary text-primary-foreground"
-            : "bg-muted text-muted-foreground";
+              : tier === "Regular" ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground";
           return (
-            <Card 
-              key={c.id} 
+            <Card
+              key={c.id}
               className="glass p-5 hover:border-primary/40 cursor-pointer transition-colors hover:bg-muted/10"
               onClick={() => setHistoryCustomer({ id: c.id, name: c.name })}
             >
@@ -104,11 +153,11 @@ function CustomersPage() {
         )}
       </div>
 
-      <CustomerHistoryDialog 
-        customerId={historyCustomer?.id || null} 
-        customerName={historyCustomer?.name || null} 
-        open={!!historyCustomer} 
-        onOpenChange={(o) => !o && setHistoryCustomer(null)} 
+      <CustomerHistoryDialog
+        customerId={historyCustomer?.id || null}
+        customerName={historyCustomer?.name || null}
+        open={!!historyCustomer}
+        onOpenChange={(o) => !o && setHistoryCustomer(null)}
       />
     </div>
   );
