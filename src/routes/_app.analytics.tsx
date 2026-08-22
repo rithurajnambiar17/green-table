@@ -47,7 +47,7 @@ function AnalyticsPage() {
     }
   }, [pinMatched]);
 
-  const HARDCODED_PIN = "191102";
+  const HARDCODED_PIN = "280474";
   const isAuthenticated = pinMatched;
 
   const allPaid = sessions.filter((s) => s.payment === "paid" && s.endedAt);
@@ -149,7 +149,7 @@ function AnalyticsPage() {
       const t = s.total - sCafe - sTobacco;
       cafe += sCafe;
       tobacco += sTobacco;
-      
+
       if (s.tableType === "snooker") snooker += t;
       else if (s.tableType === "mini_snooker") mini += t;
       else if (s.tableType === "pool") pool += t;
@@ -174,10 +174,10 @@ function AnalyticsPage() {
           <p className="text-muted-foreground text-sm">Please enter the PIN to view analytics.</p>
         </div>
         <div className="flex gap-2 w-full max-w-xs">
-          <Input 
-            type="password" 
-            placeholder="Enter PIN" 
-            value={enteredPin} 
+          <Input
+            type="password"
+            placeholder="Enter PIN"
+            value={enteredPin}
             onChange={(e) => setEnteredPin(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -340,11 +340,11 @@ function AnalyticsPage() {
           </ul>
         </Card>
       </div>
-      
-      <TableHistoryDialog 
-        tableName={historyTable} 
-        open={!!historyTable} 
-        onOpenChange={(o) => !o && setHistoryTable(null)} 
+
+      <TableHistoryDialog
+        tableName={historyTable}
+        open={!!historyTable}
+        onOpenChange={(o) => !o && setHistoryTable(null)}
       />
     </div>
   );
