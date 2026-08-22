@@ -47,7 +47,7 @@ function AnalyticsPage() {
     }
   }, [pinMatched]);
 
-  const HARDCODED_PIN = "1234";
+  const HARDCODED_PIN = "191102";
   const isAuthenticated = pinMatched;
 
   const allPaid = sessions.filter((s) => s.payment === "paid" && s.endedAt);
