@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useApp } from "@/lib/store";
 import { Card } from "@/components/ui/card";
 import { formatCurrency, formatDateTime, formatDuration } from "@/lib/format";
@@ -26,6 +26,7 @@ function UdhariPage() {
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [viewSession, setViewSession] = useState<Session | null>(null);
   const [sessionToPay, setSessionToPay] = useState<Session | null>(null);
+  const [viewGroup, setViewGroup] = useState<Session[] | null>(null);
   
   // Add Customer form state
   const [addCustName, setAddCustName] = useState("");
@@ -44,6 +45,17 @@ function UdhariPage() {
   const selectedCustomerSessions = selectedCustomer 
     ? sessions.filter(s => s.customerId === selectedCustomer.id && s.payment === "udhari").sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
     : [];
+
+  const groupedSessions = useMemo(() => {
+    const groups: Record<string, { date: string; total: number; sessions: Session[] }> = {};
+    selectedCustomerSessions.forEach(s => {
+      const date = new Date(s.startedAt).toLocaleDateString();
+      if (!groups[date]) groups[date] = { date, total: 0, sessions: [] };
+      groups[date].sessions.push(s);
+      groups[date].total += s.total;
+    });
+    return Object.values(groups).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [selectedCustomerSessions]);
 
   const handleAddUdhariCustomer = async () => {
     // Find the customer by name/phone
@@ -160,40 +172,27 @@ function UdhariPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
-              {selectedCustomerSessions.length === 0 ? (
+              {groupedSessions.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                   <BookText className="h-12 w-12 opacity-20 mb-4" />
                   <p>No pending Udhari sessions.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {selectedCustomerSessions.map((session) => (
+                  {groupedSessions.map((group) => (
                     <div 
-                      key={session.id} 
+                      key={group.date} 
                       className="flex flex-col p-4 rounded-lg bg-background border border-border/40 cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => setViewSession(session)}
+                      onClick={() => setViewGroup(group.sessions)}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-sm font-medium flex items-center gap-2">
-                          {session.tableName}
-                          <Info className="h-3 w-3 text-neon" />
+                          {new Date(group.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                          <Badge variant="outline" className="ml-2 text-xs">{group.sessions.length} sessions</Badge>
                         </span>
                         <span className="font-semibold text-destructive">
-                          {formatCurrency(session.total, settings.currency)}
+                          {formatCurrency(group.total, settings.currency)}
                         </span>
-                      </div>
-                      <div className="flex justify-between items-end">
-                        <span className="text-xs text-muted-foreground">{formatDateTime(session.startedAt)}</span>
-                        <Button
-                          size="sm"
-                          className="bg-success text-success-foreground hover:bg-success/90 h-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSessionToPay(session);
-                          }}
-                        >
-                          Mark Paid
-                        </Button>
                       </div>
                     </div>
                   ))}
@@ -254,6 +253,49 @@ function UdhariPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Grouped Sessions Dialog */}
+      <Dialog open={!!viewGroup} onOpenChange={(open) => !open && setViewGroup(null)}>
+        <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Sessions on {viewGroup ? new Date(viewGroup[0].startedAt).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : ""}</DialogTitle>
+            <DialogDescription className="sr-only">List of udhari sessions for this date</DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto space-y-3 pr-2 flex-1">
+            {viewGroup?.map((session) => (
+              <div 
+                key={session.id} 
+                className="flex flex-col p-3 rounded-lg bg-muted/30 border border-border/40"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-sm font-medium cursor-pointer hover:underline flex items-center gap-1" onClick={() => {
+                    setViewSession(session);
+                  }}>
+                    {session.tableName} <Info className="h-3 w-3 text-neon" />
+                  </span>
+                  <span className="font-semibold text-destructive">
+                    {formatCurrency(session.total, settings.currency)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-end">
+                  <span className="text-xs text-muted-foreground">{formatDateTime(session.startedAt)}</span>
+                  <Button
+                    size="sm"
+                    className="bg-success text-success-foreground hover:bg-success/90 h-8"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSessionToPay(session);
+                      setViewGroup(null); // Close the group dialog when marking paid to focus on the payment dialog
+                    }}
+                  >
+                    Mark Paid
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
       <MarkPaidDialog

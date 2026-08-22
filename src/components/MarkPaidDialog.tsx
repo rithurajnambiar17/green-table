@@ -31,10 +31,13 @@ export function MarkPaidDialog({ session, open, onOpenChange, onSuccess }: Props
     setIsSubmitting(true);
     try {
       const finalNote = note.trim();
-      if (finalNote !== (session.notes || "")) {
-        await updateSession(session.id, { notes: finalNote });
+      const ids = session.id.split(',');
+      for (const id of ids) {
+        if (finalNote !== (session.notes || "")) {
+          await updateSession(id, { notes: finalNote });
+        }
+        await markPaid(id);
       }
-      await markPaid(session.id);
       toast.success("Session marked as paid");
       onOpenChange(false);
       onSuccess?.(finalNote);

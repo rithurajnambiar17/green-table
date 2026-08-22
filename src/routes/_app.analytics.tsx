@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useApp } from "@/lib/store";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { TableHistoryDialog } from "@/components/TableHistoryDialog";
 import {
   ResponsiveContainer,
@@ -32,6 +33,22 @@ function AnalyticsPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [historyTable, setHistoryTable] = useState<string | null>(null);
+
+  const [enteredPin, setEnteredPin] = useState("");
+  const [pinMatched, setPinMatched] = useState(false);
+
+  useEffect(() => {
+    if (pinMatched) {
+      const timer = setTimeout(() => {
+        setPinMatched(false);
+        setEnteredPin("");
+      }, 5 * 60 * 1000); // 5 minutes timeout
+      return () => clearTimeout(timer);
+    }
+  }, [pinMatched]);
+
+  const HARDCODED_PIN = "1234";
+  const isAuthenticated = pinMatched;
 
   const allPaid = sessions.filter((s) => s.payment === "paid" && s.endedAt);
   const paid = useMemo(() => {
@@ -149,19 +166,51 @@ function AnalyticsPage() {
 
   const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-display mb-2">Protected Analytics</h2>
+          <p className="text-muted-foreground text-sm">Please enter the PIN to view analytics.</p>
+        </div>
+        <div className="flex gap-2 w-full max-w-xs">
+          <Input 
+            type="password" 
+            placeholder="Enter PIN" 
+            value={enteredPin} 
+            onChange={(e) => setEnteredPin(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (enteredPin === HARDCODED_PIN) setPinMatched(true);
+              }
+            }}
+          />
+          <Button onClick={() => {
+            if (enteredPin === HARDCODED_PIN) setPinMatched(true);
+          }}>Verify</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Date Filter */}
-      <div className="flex flex-wrap items-center gap-4 bg-muted/20 p-3 rounded-lg border border-border/60">
-        <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Date Filter</div>
-        <div className="flex items-center gap-2">
-          <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-8 w-auto text-sm" />
-          <span className="text-muted-foreground">to</span>
-          <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-8 w-auto text-sm" />
-          {(startDate || endDate) && (
-            <button className="text-xs text-muted-foreground hover:text-foreground ml-2" onClick={() => { setStartDate(""); setEndDate(""); }}>Clear</button>
-          )}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-muted/20 p-3 rounded-lg border border-border/60">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider">Date Filter</div>
+          <div className="flex items-center gap-2">
+            <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-8 w-auto text-sm" />
+            <span className="text-muted-foreground">to</span>
+            <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-8 w-auto text-sm" />
+            {(startDate || endDate) && (
+              <button className="text-xs text-muted-foreground hover:text-foreground ml-2" onClick={() => { setStartDate(""); setEndDate(""); }}>Clear</button>
+            )}
+          </div>
         </div>
+        <Button variant="outline" size="sm" onClick={() => { setPinMatched(false); setEnteredPin(""); }}>
+          Lock Analytics
+        </Button>
       </div>
 
       {/* Hero strip */}
