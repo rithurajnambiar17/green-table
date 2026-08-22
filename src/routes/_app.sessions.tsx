@@ -83,14 +83,14 @@ function SessionsPage() {
           existing.accumulatedMs += s.accumulatedMs;
           existing.extrasTotal += s.extrasTotal;
           existing.total += s.total;
-          
+
           existing.extras = [...existing.extras, ...s.extras];
-          
+
           if (new Date(s.startedAt) < new Date(existing.startedAt)) {
-             existing.startedAt = s.startedAt;
+            existing.startedAt = s.startedAt;
           }
           if (s.endedAt && (!existing.endedAt || new Date(s.endedAt) > new Date(existing.endedAt))) {
-             existing.endedAt = s.endedAt;
+            existing.endedAt = s.endedAt;
           }
           if (s.notes) {
             existing.notes = existing.notes ? `${existing.notes}\n${s.notes}` : s.notes;
@@ -131,11 +131,11 @@ function SessionsPage() {
       return;
     }
     const headers = ["Player", "Phone", "Table", "Type", "Started At", "Ended At", "Duration (mins)", "Status", "Payment", "Extras Cost", "Total", "Items"];
-    const allToExport = filtered.flatMap((s: Session & { subSessions?: Session[] }) => 
+    const allToExport = filtered.flatMap((s: Session & { subSessions?: Session[] }) =>
       (s.subSessions && s.subSessions.length > 1) ? s.subSessions : [s]
     );
     const rows = allToExport.map(s => {
-      const itemsStr = s.extras && s.extras.length > 0 
+      const itemsStr = s.extras && s.extras.length > 0
         ? s.extras.map(e => `${e.name} (x${e.qty})`).join(" | ")
         : "-";
       return [
@@ -153,13 +153,13 @@ function SessionsPage() {
         itemsStr
       ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",");
     });
-    
+
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `sessions_statement_${new Date().toISOString().slice(0,10)}.csv`;
+    link.download = `sessions_statement_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -203,11 +203,11 @@ function SessionsPage() {
           <Button variant="outline" onClick={exportCSV} className="gap-2">
             <Download className="h-4 w-4" /> Export Statement
           </Button>
-          {isAdmin && (
+          {/* {isAdmin && (
             <Button variant="destructive" onClick={handleClear} className="gap-2">
               <Trash2 className="h-4 w-4" /> Clear All Data
             </Button>
-          )}
+          )} */}
         </div>
       </header>
 
@@ -231,7 +231,7 @@ function SessionsPage() {
             </Button>
           ))}
         </div>
-        
+
         <div className="flex items-center gap-2 ml-auto">
           <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-9 w-auto text-sm" />
           <span className="text-muted-foreground text-sm">to</span>
@@ -295,7 +295,7 @@ function SessionsPage() {
 
                 return (
                   <Fragment key={s.id}>
-                    <tr 
+                    <tr
                       className={`transition-colors hover:bg-muted/30 cursor-pointer ${isGroup ? 'bg-muted/10' : ''}`}
                       onClick={() => isGroup ? setViewGroup(s.subSessions!) : setViewSession(s)}
                     >
@@ -319,9 +319,9 @@ function SessionsPage() {
                         <Badge
                           className={
                             s.status === "running" ? "bg-primary text-primary-foreground"
-                            : s.status === "paused" ? "bg-warning text-warning-foreground"
-                            : s.payment === "paid" ? "bg-success text-success-foreground"
-                            : "bg-destructive text-destructive-foreground"
+                              : s.status === "paused" ? "bg-warning text-warning-foreground"
+                                : s.payment === "paid" ? "bg-success text-success-foreground"
+                                  : "bg-destructive text-destructive-foreground"
                           }
                         >
                           {s.status === "ended" ? (s.payment === "paid" ? "Paid" : "Unpaid") : s.status}
@@ -370,7 +370,7 @@ function SessionsPage() {
                 <div><span className="text-muted-foreground block text-xs uppercase">Player</span> <span className="font-medium">{activeSession.customerName}</span></div>
                 <div><span className="text-muted-foreground block text-xs uppercase">Table</span> <span className="font-medium">{activeSession.tableName}</span></div>
               </div>
-              
+
               <div>
                 <p className="text-xs uppercase text-muted-foreground mb-2">Items Purchased</p>
                 {activeSession.payment === "unpaid" && activeSession.status === "ended" ? (
@@ -462,8 +462,8 @@ function SessionsPage() {
           </DialogHeader>
           <div className="overflow-y-auto space-y-3 pr-2 flex-1">
             {viewGroup?.map((session) => (
-              <div 
-                key={session.id} 
+              <div
+                key={session.id}
                 className="flex flex-col p-4 rounded-lg bg-muted/30 border border-border/40 cursor-pointer hover:bg-muted/50 transition-colors"
                 onClick={() => {
                   setViewSession(session);

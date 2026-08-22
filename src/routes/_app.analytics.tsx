@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { TableHistoryDialog } from "@/components/TableHistoryDialog";
+import { toast } from "sonner";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -182,11 +183,13 @@ function AnalyticsPage() {
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 if (enteredPin === HARDCODED_PIN) setPinMatched(true);
+                else toast.error("Incorrect PIN");
               }
             }}
           />
           <Button onClick={() => {
             if (enteredPin === HARDCODED_PIN) setPinMatched(true);
+            else toast.error("Incorrect PIN");
           }}>Verify</Button>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
 import { CustomerHistoryDialog } from "@/components/CustomerHistoryDialog";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/customers")({
   head: () => ({ meta: [{ title: "Customers — Green Table" }] }),
@@ -73,11 +74,13 @@ function CustomersPage() {
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 if (enteredPin === HARDCODED_PIN) setPinMatched(true);
+                else toast.error("Incorrect PIN");
               }
             }}
           />
           <Button onClick={() => {
             if (enteredPin === HARDCODED_PIN) setPinMatched(true);
+            else toast.error("Incorrect PIN");
           }}>Verify</Button>
         </div>
       </div>

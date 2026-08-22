@@ -44,7 +44,7 @@ interface AppContextValue extends AppState {
   pauseSession: (sessionId: string) => Promise<void>;
   resumeSession: (sessionId: string) => Promise<void>;
   endSession: (id: string) => Promise<Session | undefined>;
-  updateSession: (id: string, patch: { hourlyRate?: number; discount?: number; manualAdjustment?: number; taxRate?: number; notes?: string }) => Promise<void>;
+  updateSession: (id: string, patch: { hourlyRate?: number; discount?: number; manualAdjustment?: number; taxRate?: number; notes?: string; customerName?: string; customerPhone?: string }) => Promise<void>;
   markPaid: (id: string) => Promise<void>;
   markUdhari: (id: string) => Promise<void>;
   toggleUdhariAccess: (customerId: string, allow: boolean) => Promise<void>;
@@ -401,17 +401,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [sessions]);
 
   const updateSession: AppContextValue["updateSession"] = useCallback(async (id, patch) => {
-    const dbPatch: { hourly_rate?: number; discount?: number; manual_adjustment?: number; tax_rate?: number; notes?: string } = {};
+    const dbPatch: { hourly_rate?: number; discount?: number; manual_adjustment?: number; tax_rate?: number; notes?: string; customer_id?: string | null; customer_name?: string; customer_phone?: string; } = {};
     if (patch.hourlyRate !== undefined) dbPatch.hourly_rate = patch.hourlyRate;
     if (patch.discount !== undefined) dbPatch.discount = patch.discount;
     if (patch.manualAdjustment !== undefined) dbPatch.manual_adjustment = patch.manualAdjustment;
     if (patch.taxRate !== undefined) dbPatch.tax_rate = patch.taxRate;
     if (patch.notes !== undefined) dbPatch.notes = patch.notes;
+
+    let nextCustomerId: string | null | undefined = undefined;
+    if (patch.customerPhone !== undefined) {
+      const existing = customers.find((c) => c.phone === patch.customerPhone);
+      nextCustomerId = existing?.id ?? null;
+      if (existing) {
+        await supabase.from("customers").update({
+          name: patch.customerName || existing.name,
+        }).eq("id", existing.id);
+      } else {
+        const { data: ins } = await supabase.from("customers").insert({
+          name: patch.customerName || "Walk-in", 
+          phone: patch.customerPhone, 
+          visits: 1, 
+          last_visit: new Date().toISOString(),
+        }).select("id").maybeSingle();
+        nextCustomerId = ins?.id ?? null;
+      }
+      dbPatch.customer_id = nextCustomerId;
+      dbPatch.customer_name = patch.customerName;
+      dbPatch.customer_phone = patch.customerPhone;
+    }
+
     if (Object.keys(dbPatch).length) {
       await supabase.from("sessions").update(dbPatch).eq("id", id);
-      setSessions(prev => prev.map(x => x.id === id ? { ...x, ...patch } : x));
+      setSessions(prev => prev.map(x => x.id === id ? { 
+        ...x, 
+        ...patch, 
+        ...(nextCustomerId !== undefined ? { customerId: nextCustomerId } : {})
+      } : x));
     }
-  }, []);
+  }, [customers]);
 
   const markPaid = useCallback(async (id: string) => {
     await supabase.from("sessions").update({ payment: "paid" }).eq("id", id);

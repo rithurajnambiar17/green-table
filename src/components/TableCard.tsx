@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import {
   Play, Pause, Square, CheckCircle2, Pencil, CircleDollarSign,
-  MessageCircle, Coffee, ChevronDown, ChevronUp, BookText
+  MessageCircle, Coffee, ChevronDown, ChevronUp, BookText, ArrowRightLeft
 } from "lucide-react";
 import { sessionElapsedMs, useApp, rateForType } from "@/lib/store";
 import { TABLE_TYPE_LABEL, type ClubTable, type Session } from "@/lib/types";
@@ -20,6 +20,7 @@ import { calcBill, formatCurrency, formatDuration, sumExtras } from "@/lib/forma
 import { toast } from "sonner";
 import { MarkPaidDialog } from "@/components/MarkPaidDialog";
 import { ExtrasManager } from "./ExtrasManager";
+import { TransferSessionDialog } from "./TransferSessionDialog";
 import { useMounted } from "@/hooks/use-mounted";
 
 interface Props {
@@ -34,6 +35,7 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
   const mounted = useMounted();
   const [showExtras, setShowExtras] = useState(false);
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
 
   const [tick, setTick] = useState(0);
 
@@ -183,6 +185,9 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
               <Button size="sm" variant="ghost" onClick={() => onEdit(session)}>
                 <Pencil className="mr-1.5 h-4 w-4" /> Edit
               </Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowTransferDialog(true)}>
+                <ArrowRightLeft className="mr-1.5 h-4 w-4" /> Transfer
+              </Button>
               {status === "ended" && session.payment === "unpaid" && (
                 <>
                   <Button
@@ -258,6 +263,14 @@ export function TableCard({ table, session, onStart, onEdit }: Props) {
           session={session}
           open={showMarkPaidDialog}
           onOpenChange={setShowMarkPaidDialog}
+        />
+      )}
+
+      {session && (
+        <TransferSessionDialog
+          session={session}
+          open={showTransferDialog}
+          onOpenChange={setShowTransferDialog}
         />
       )}
     </Card>
