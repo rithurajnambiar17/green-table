@@ -14,10 +14,11 @@ import {
 } from "@/components/ui/dialog";
 import type { Session } from "@/lib/types";
 import { formatCurrency, formatDuration } from "@/lib/format";
-import { MessageCircle, Download, Trash2, CheckCircle2, BookText, ChevronRight, ChevronDown } from "lucide-react";
+import { MessageCircle, Download, Trash2, CheckCircle2, BookText, ChevronRight, ChevronDown, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { ExtrasManager } from "@/components/ExtrasManager";
 import { MarkPaidDialog } from "@/components/MarkPaidDialog";
+import { TransferSessionDialog } from "@/components/TransferSessionDialog";
 
 export const Route = createFileRoute("/_app/sessions")({
   head: () => ({ meta: [{ title: "Sessions — Green Table" }] }),
@@ -33,6 +34,7 @@ function SessionsPage() {
   const [viewSession, setViewSession] = useState<Session | null>(null);
   const activeSession = viewSession ? sessions.find(s => s.id === viewSession.id) || viewSession : null;
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
 
   const [viewGroup, setViewGroup] = useState<Session[] | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -412,6 +414,13 @@ function SessionsPage() {
               <div className="pt-4 border-t border-border/60 flex flex-wrap justify-end gap-3">
                 {activeSession.payment === "unpaid" && activeSession.status === "ended" && (
                   <>
+                    <Button
+                      className="gap-2"
+                      variant="outline"
+                      onClick={() => setShowTransferDialog(true)}
+                    >
+                      <ArrowRightLeft className="h-4 w-4" /> Transfer
+                    </Button>
                     {(() => {
                       const c = customers.find((x) => x.id === activeSession.customerId);
                       if (c?.allowCredit) {
@@ -499,6 +508,12 @@ function SessionsPage() {
             setViewSession({ ...activeSession, payment: "paid", notes: note });
           }
         }}
+      />
+
+      <TransferSessionDialog
+        session={activeSession}
+        open={showTransferDialog}
+        onOpenChange={setShowTransferDialog}
       />
     </div>
   );
