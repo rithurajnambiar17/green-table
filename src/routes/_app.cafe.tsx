@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useApp } from "@/lib/store";
 import { Card } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
 import { Coffee, Search } from "lucide-react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -40,10 +41,26 @@ function CafePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [paymentFilter, setPaymentFilter] = useState<"all" | "paid" | "unpaid">("paid");
+  const [paymentFilter, setPaymentFilter] = useState<"all" | "paid" | "unpaid" | "udhari">("paid");
 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+
+  const [enteredPin, setEnteredPin] = useState("");
+  const [pinMatched, setPinMatched] = useState(false);
+
+  useEffect(() => {
+    if (pinMatched) {
+      const timer = setTimeout(() => {
+        setPinMatched(false);
+        setEnteredPin("");
+      }, 5 * 60 * 1000); // 5 minutes timeout
+      return () => clearTimeout(timer);
+    }
+  }, [pinMatched]);
+
+  const HARDCODED_PIN = "1234";
+  const isAuthenticated = pinMatched;
 
   const logs = useMemo(() => {
     let baseSessions = sessions.filter((s) => s.endedAt);
@@ -52,6 +69,8 @@ function CafePage() {
       baseSessions = baseSessions.filter(s => s.payment === "paid");
     } else if (paymentFilter === "unpaid") {
       baseSessions = baseSessions.filter(s => s.payment === "unpaid");
+    } else if (paymentFilter === "udhari") {
+      baseSessions = baseSessions.filter(s => s.payment === "udhari");
     }
     
     if (startDate) {
@@ -124,10 +143,39 @@ function CafePage() {
     return filteredLogs.slice(start, start + pageSize);
   }, [filteredLogs, currentPage]);
 
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-display mb-2">Protected Cafe Log</h2>
+          <p className="text-muted-foreground text-sm">Please enter the PIN to view the cafe log.</p>
+        </div>
+        <div className="flex gap-2 w-full max-w-xs">
+          <Input 
+            type="password" 
+            placeholder="Enter PIN" 
+            value={enteredPin} 
+            onChange={(e) => setEnteredPin(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (enteredPin === HARDCODED_PIN) setPinMatched(true);
+                else toast.error("Incorrect PIN");
+              }
+            }}
+          />
+          <Button onClick={() => {
+            if (enteredPin === HARDCODED_PIN) setPinMatched(true);
+            else toast.error("Incorrect PIN");
+          }}>Verify</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Daily Ledger</p>
             <h1 className="font-display text-3xl md:text-4xl">Cafe Log</h1>
@@ -135,14 +183,19 @@ function CafePage() {
               Track daily cafe sales, items sold, and quantities.
             </p>
           </div>
-          <div className="relative w-full md:w-64 flex-shrink-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search items..." 
-              className="pl-9 bg-background/50 backdrop-blur-sm border-border/60"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex flex-col sm:flex-row items-end gap-3">
+            <Button variant="outline" size="sm" onClick={() => { setPinMatched(false); setEnteredPin(""); }}>
+              Lock Cafe Log
+            </Button>
+            <div className="relative w-full md:w-64 flex-shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search items..." 
+                className="pl-9 bg-background/50 backdrop-blur-sm border-border/60"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
         </div>
         
@@ -170,6 +223,7 @@ function CafePage() {
                 <SelectItem value="all">All</SelectItem>
                 <SelectItem value="paid">Paid</SelectItem>
                 <SelectItem value="unpaid">Unpaid</SelectItem>
+                <SelectItem value="udhari">Udhari</SelectItem>
               </SelectContent>
             </Select>
           </div>
